@@ -2,8 +2,11 @@ blueprint:
   name: "Marstek Venus - Negative Price Grid Charging"
   description: >
     Automatically charge your Marstek Venus battery from the grid when prices
-    go negative (you get paid), and discharge before the most expensive hour
-    of the day to sell at the highest price.
+    drop below a configurable threshold, and discharge before the most expensive
+    hour of the day to sell at the highest price.
+
+    Between the charge and discharge thresholds, the automation does nothing
+    (dead zone), letting the battery manage itself normally.
 
     You must select the Marstek Venus entities for each battery you want to
     control. If you have multiple batteries, select all corresponding entities
@@ -100,12 +103,36 @@ blueprint:
       selector:
         text:
 
+    charge_threshold:
+      name: "Charge Threshold (EUR/kWh)"
+      description: "Charge from grid when price drops below this value. Between thresholds, the automation does nothing."
+      default: 0
+      selector:
+        number:
+          min: -0.5
+          max: 1
+          step: 0.01
+          mode: box
+
+    discharge_threshold:
+      name: "Discharge Threshold (EUR/kWh)"
+      description: "Allow discharge to grid when price exceeds this value. Between thresholds, the automation does nothing."
+      default: 0.15
+      selector:
+        number:
+          min: 0
+          max: 1
+          step: 0.01
+          mode: box
+
 variables:
   price_sensor: !input price_sensor
   notify_service: !input notify_service
   battery_version: !input battery_version
   max_charge_power_input: !input max_charge_power
   max_discharge_power_input: !input max_discharge_power
+  charge_threshold: !input charge_threshold
+  discharge_threshold: !input discharge_threshold
 
   # Map battery version to the correct Force Mode option strings.
   charge_option: >
@@ -128,65 +155,31 @@ variables:
     {% set values = expand(entities) | map(attribute='state') | reject('in', ['unavailable','unknown','none']) | map('float', 0) | select('gt', 0) | list %}
     {{ values | min if values | length > 0 else 2500 }}
 
-  # ---- Helper: safely read a list attribute from the price sensor ----
-  # Nordpool normally stores raw_today/raw_tomorrow as native lists.
-  # Some integrations or template sensors may store them as JSON strings.
-  # This ensures we ALWAYS get a real list (never a string/None).
-  _today_attr: >
-    {{ state_attr(price_sensor, 'raw_today') }}
-  _tomorrow_attr: >
-    {{ state_attr(price_sensor, 'raw_tomorrow') }}
-
-  _raw_today: >
-    {% set val = _today_attr %}
-    {% if val is none %}
-      {{ [] }}
-    {% elif val is iterable and val is not string %}
-      {{ val }}
-    {% elif val is string and val | length > 0 %}
-      {% set trimmed = val | trim %}
-      {% if trimmed.startswith('[') and trimmed.endswith(']') %}
-        {{ trimmed | from_json | default([]) }}
-      {% else %}
-        {{ [] }}
-      {% endif %}
-    {% else %}
-      {{ [] }}
-    {% endif %}
-
-  _raw_tomorrow: >
-    {% set val = _tomorrow_attr %}
-    {% if val is none %}
-      {{ [] }}
-    {% elif val is iterable and val is not string %}
-      {{ val }}
-    {% elif val is string and val | length > 0 %}
-      {% set trimmed = val | trim %}
-      {% if trimmed.startswith('[') and trimmed.endswith(']') %}
-        {{ trimmed | from_json | default([]) }}
-      {% else %}
-        {{ [] }}
-      {% endif %}
-    {% else %}
-      {{ [] }}
-    {% endif %}
-
   _all_prices: >
     {% set ns = namespace(prices=[]) %}
     {% set now_local = now() %}
-    {% for item in _raw_today %}
-      {% if item is mapping and 'start' in item and 'value' in item %}
-        {% set start = item.start | as_datetime | as_local %}
-        {% if start >= now_local %}
-          {% set ns.prices = ns.prices + [{'hour': start.hour, 'price': item.value | float(-999)}] %}
-        {% endif %}
-      {% endif %}
-    {% endfor %}
-    {% for item in _raw_tomorrow %}
-      {% if item is mapping and 'start' in item and 'value' in item %}
-        {% set start = item.start | as_datetime | as_local %}
-        {% if start >= now_local %}
-          {% set ns.prices = ns.prices + [{'hour': start.hour, 'price': item.value | float(-999)}] %}
+    {% for source in [state_attr(price_sensor, 'raw_today'), state_attr(price_sensor, 'raw_tomorrow')] %}
+      {% if source is iterable and source is not string %}
+        {% for item in source %}
+          {% if item is mapping and 'start' in item and 'value' in item %}
+            {% set start = item.start | as_datetime | as_local %}
+            {% if start >= now_local %}
+              {% set ns.prices = ns.prices + [{'hour': start.hour, 'price': item.value | float(-999)}] %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+      {% elif source is string and source | length > 0 %}
+        {% set trimmed = source | trim %}
+        {% if trimmed.startswith('[') and trimmed.endswith(']') %}
+          {% set parsed = trimmed | from_json | default([]) %}
+          {% for item in parsed %}
+            {% if item is mapping and 'start' in item and 'value' in item %}
+              {% set start = item.start | as_datetime | as_local %}
+              {% if start >= now_local %}
+                {% set ns.prices = ns.prices + [{'hour': start.hour, 'price': item.value | float(-999)}] %}
+              {% endif %}
+            {% endif %}
+          {% endfor %}
         {% endif %}
       {% endif %}
     {% endfor %}
@@ -211,20 +204,6 @@ variables:
     {% endif %}
 
 trigger:
-  - platform: numeric_state
-    entity_id: !input price_sensor
-    below: 0
-    for:
-      minutes: 5
-    id: price_negative
-
-  - platform: numeric_state
-    entity_id: !input price_sensor
-    above: 0
-    for:
-      minutes: 5
-    id: price_positive
-
   - platform: time_pattern
     minutes: "/1"
     id: time_tick
@@ -232,12 +211,20 @@ trigger:
 condition: []
 
 action:
+  - variables:
+      current_price: "{{ states(price_sensor) | float(-999) }}"
+
   - choose:
 
-      # Negative price → charge from grid
+      # Price below charge threshold → charge from grid
       - conditions:
           - condition: trigger
-            id: price_negative
+            id: time_tick
+          - condition: template
+            value_template: "{{ current_price < charge_threshold | float }}"
+          - condition: state
+            entity_id: !input manual_mode_switch
+            state: "off"
         sequence:
           - service: switch.turn_on
             target:
@@ -259,7 +246,7 @@ action:
             data:
               level: info
               message: >
-                NEGATIVE PRICE: {{ states(price_sensor) }} EUR/kWh.
+                PRICE BELOW THRESHOLD: {{ current_price }} EUR/kWh (threshold: {{ charge_threshold }}).
                 Manual mode ON. Charging from grid at {{ charge_power }}W.
 
           - choose:
@@ -269,16 +256,30 @@ action:
                 sequence:
                   - service: "{{ notify_service }}"
                     data:
-                      title: "Negative Price - Charging"
+                      title: "Low Price - Charging"
                       message: >
-                        Price: {{ states(price_sensor) }} EUR/kWh.
+                        Price: {{ current_price }} EUR/kWh (below {{ charge_threshold }}).
                         Battery charging from grid at {{ charge_power }}W.
             default: []
 
-      # Price positive → restore normal
+      # Price above discharge threshold → stop charging (but not during peak window)
       - conditions:
           - condition: trigger
-            id: price_positive
+            id: time_tick
+          - condition: template
+            value_template: "{{ current_price > discharge_threshold | float }}"
+          - condition: state
+            entity_id: !input manual_mode_switch
+            state: "on"
+          - condition: template
+            value_template: >
+                {% set ph = peak_hour | int %}
+                {% set h = now().hour %}
+                {% set m = now().minute %}
+                {% set is_pre_peak = (h + 1) % 24 == ph and m == 30 %}
+                {% set is_post_peak = (h - 1) % 24 == ph and m == 0 %}
+                {% set is_peak_hour = h == ph %}
+                {{ not is_pre_peak and not is_peak_hour and not is_post_peak }}
         sequence:
           - service: switch.turn_off
             target:
@@ -294,22 +295,19 @@ action:
             data:
               level: info
               message: >
-                Price positive: {{ states(price_sensor) }} EUR/kWh.
+                Price above threshold: {{ current_price }} EUR/kWh (threshold: {{ discharge_threshold }}).
                 Manual mode OFF. Automatic control resumed.
 
-      # 30 min before peak → discharge to sell
+      # 30 min before peak → discharge to sell (only if peak_price > discharge_threshold)
       - conditions:
           - condition: trigger
             id: time_tick
-          - condition: numeric_state
-            entity_id: !input price_sensor
-            above: 0
           - condition: template
             value_template: >
               {{ (now().hour + 1) % 24 == peak_hour | int and now().minute == 30 }}
           - condition: template
             value_template: >
-              {{ peak_price | float > 0.15 }}
+              {{ peak_price | float > discharge_threshold | float }}
         sequence:
           - service: switch.turn_on
             target:
@@ -332,7 +330,7 @@ action:
               level: info
               message: >
                 DAILY PEAK at {{ peak_hour }}:00
-                (price: {{ peak_price }} EUR/kWh).
+                (price: {{ peak_price }} EUR/kWh, threshold: {{ discharge_threshold }}).
                 Manual mode ON. Discharging to sell at {{ discharge_power }}W.
 
           - choose:

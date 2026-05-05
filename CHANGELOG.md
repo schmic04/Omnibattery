@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.7.5] - 2026-05-05
+
+### Fixed
+- **Battery falsely excluded as non-responsive at min-SOC**: When the polling SOC reported a value just above `min_soc` (e.g. 30.1 % with min_soc = 30 %), the battery passed the `_get_available_batteries()` filter and received a discharge command. The internal BMS, however, had already reached its discharge cutoff and blocked power delivery (0 W). The feedback check interpreted this as a non-delivery and, after 3 consecutive cycles, excluded the battery. Fixed by adding a guard before `record_non_delivery`: if `current_soc ≤ min_soc + 1 %`, the 0 W output is treated as expected BMS protection behaviour rather than a fault, and the non-delivery counter is not incremented.
+
 ## [1.7.4] - 2026-05-02
 
 ### Added

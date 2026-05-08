@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.6] - 2026-05-08
+
+### Fixed
+- **Hourly net balance: prevent forced discharge when importing from grid**: When solar is insufficient and the system has net import from the grid, the hourly balance manager was forcing battery discharge to meet the target balance. This violated the principle that the grid should supply household demand when solar is insufficient. Fixed by clamping the offset to zero when `deficit_wh < 0` (importing neto), preventing negative offsets that trigger discharge. The grid now supplies the household while batteries remain idle when solar is insufficient.
+
+### Changed
+- **Hourly net balance: added smart meter requirement notice**: The feature description now includes a warning that hourly net balance control is only beneficial when using electricity contracts with smart meters that perform hourly net balance calculation. Without hourly netting at the meter level, battery setpoint adjustments do not translate to cost savings. Notice added to all language translations (EN, ES, DE, FR, NL).
+
 ## [1.7.5] - 2026-05-08
 
 ### Added

@@ -35,10 +35,10 @@ See [Solar charge delay](../features/solar-charge-delay.md) for how it works.
 
 Limits discharge when SOC drops below a threshold, covering only consumption peaks that exceed a configurable power limit.
 
-| Field | Description | Default |
-|---|---|---|
-| **SOC threshold** | Protection activates below this % | `30 %` |
-| **Peak power limit** | Maximum consumption the battery covers; the excess falls to the grid | `2500 W` |
+| Field | Description | Default | Range |
+|---|---|---|---|
+| **SOC threshold** | Protection activates below this % | `30 %` | `20-100 %` |
+| **Peak power limit** | Maximum consumption the battery covers; the excess falls to the grid | `2500 W` | `500-10000 W` |
 
 See [Peak shaving](../features/peak-shaving.md) for how it works.
 

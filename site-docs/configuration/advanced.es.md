@@ -35,10 +35,10 @@ Ver [Retraso de carga solar](../features/solar-charge-delay.md) para el detalle 
 
 Limita la descarga cuando el SOC cae por debajo de un umbral, cubriendo solo los picos de consumo que superen un límite configurable.
 
-| Campo | Descripción | Por defecto |
-|---|---|---|
-| **Umbral de SOC** | Por debajo de este % la protección se activa | `30 %` |
-| **Límite de potencia de pico** | Consumo máximo que la batería cubre; el exceso va a la red | `2500 W` |
+| Campo | Descripción | Por defecto | Rango |
+|---|---|---|---|
+| **Umbral de SOC** | Por debajo de este % la protección se activa | `30 %` | `20-100 %` |
+| **Límite de potencia de pico** | Consumo máximo que la batería cubre; el exceso va a la red | `2500 W` | `500-10000 W` |
 
 Ver [Peak shaving](../features/peak-shaving.md) para el detalle de funcionamiento.
 

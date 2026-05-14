@@ -114,6 +114,13 @@ _LOGGER = logging.getLogger(__name__)
 # Dynamic pricing data structures
 PriceSlot = namedtuple("PriceSlot", ["start", "end", "price"])
 
+# Charge taper used whenever a battery is charged at high SOC.
+# Above 95% the final phase is intentionally slow to reduce BMS cutoff/float churn.
+FULL_CHARGE_TAPER_STEPS = (
+    (98, 100),
+    (95, 500),
+)
+
 
 @dataclass
 class DynamicPricingSchedule:
@@ -490,7 +497,7 @@ class ChargeDischargeController:
     def _effective_system_capacity(self, batteries: list, is_charging: bool) -> int:
         """Return available capacity after applying the optional global cap."""
         total_capacity = sum(
-            c.max_charge_power if is_charging else c.max_discharge_power
+            self._battery_power_limit(c, is_charging)
             for c in batteries
         )
         system_limit = self._configured_system_limit(is_charging)
@@ -512,6 +519,21 @@ class ChargeDischargeController:
     def _clamp_to_system_capacity(self, power: float, batteries: list, is_charging: bool) -> float:
         """Clamp a positive direction-specific power request to available capacity."""
         return min(power, self._effective_system_capacity(batteries, is_charging))
+
+    def _battery_power_limit(self, coordinator, is_charging: bool) -> int:
+        """Return the effective per-battery power limit for the current cycle."""
+        if not is_charging:
+            return coordinator.max_discharge_power
+
+        limit = coordinator.max_charge_power
+        if coordinator.data is None:
+            return limit
+
+        current_soc = coordinator.data.get("battery_soc", 0)
+        for soc_threshold, tapered_limit in FULL_CHARGE_TAPER_STEPS:
+            if current_soc >= soc_threshold:
+                return min(limit, tapered_limit)
+        return limit
 
     def update_pd_parameters(self):
         """Re-read PD controller parameters from config_entry.data (hot-reload)."""
@@ -2396,7 +2418,7 @@ class ChargeDischargeController:
         # Get each battery's individual limit
         limits = {}
         for c in available_batteries:
-            limits[c] = c.max_charge_power if is_charging else c.max_discharge_power
+            limits[c] = self._battery_power_limit(c, is_charging)
 
         total_capacity = sum(limits.values())
         if total_capacity <= 0:
@@ -2539,7 +2561,7 @@ class ChargeDischargeController:
 
         for battery in sorted_batteries:
             selected.append(battery)
-            limit = battery.max_charge_power if is_charging else battery.max_discharge_power
+            limit = self._battery_power_limit(battery, is_charging)
             combined_capacity += limit
             activation_threshold = max(
                 MULTI_BATTERY_MIN_ACTIVATION,
@@ -2555,9 +2577,9 @@ class ChargeDischargeController:
             # otherwise re-add it so it stays active until the load genuinely drops.
             for battery in previous_active:
                 if battery not in selected and battery in available_batteries:
-                    limit = battery.max_charge_power if is_charging else battery.max_discharge_power
+                    limit = self._battery_power_limit(battery, is_charging)
                     first_limit = (
-                        selected[0].max_charge_power if is_charging else selected[0].max_discharge_power
+                        self._battery_power_limit(selected[0], is_charging)
                     ) if selected else limit
                     act_thr = max(MULTI_BATTERY_MIN_ACTIVATION,
                                   min(MULTI_BATTERY_MAX_ACTIVATION, crossover_w / first_limit))
@@ -2573,11 +2595,9 @@ class ChargeDischargeController:
             if len(selected) > 1:
                 last = selected[-1]
                 if last not in previous_active:
-                    last_limit = last.max_charge_power if is_charging else last.max_discharge_power
+                    last_limit = self._battery_power_limit(last, is_charging)
                     capacity_without_last = combined_capacity - last_limit
-                    prev_limit = (
-                        selected[-2].max_charge_power if is_charging else selected[-2].max_discharge_power
-                    )
+                    prev_limit = self._battery_power_limit(selected[-2], is_charging)
                     act_thr_with_hyst = min(
                         max(MULTI_BATTERY_MIN_ACTIVATION,
                             min(MULTI_BATTERY_MAX_ACTIVATION, crossover_w / prev_limit))
@@ -2607,7 +2627,7 @@ class ChargeDischargeController:
                 and hold_cycles.get(battery, 0) > 0
             ):
                 selected.append(battery)
-                held_limit = battery.max_charge_power if is_charging else battery.max_discharge_power
+                held_limit = self._battery_power_limit(battery, is_charging)
                 combined_capacity += held_limit
                 _LOGGER.debug(
                     "Load sharing [%s]: holding %s active for %d more cycles",

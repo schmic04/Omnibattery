@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.8.2] - 2026-05-13
+
+### Added
+- **High-SOC charge taper**: During any charge, the controller now caps each battery's charge allocation to 500 W from 95% SOC and 100 W from 98% SOC, while still respecting the existing per-battery and system power limits.
+
 ## [1.8.1] - 2026-05-12
 
 ### ⚠️ Breaking Change — Dynamic Pricing discharge threshold priority

@@ -109,22 +109,9 @@ from .const import (
     NORMAL_BALANCE_PAUSE_CELL_VOLTAGE,
     NORMAL_BALANCE_RESUME_CELL_VOLTAGE,
     NORMAL_BALANCE_CHARGE_POWER_W,
-    NORMAL_BALANCE_DAILY_MAX_SECONDS,
-    NORMAL_BALANCE_MAX_TICK_SECONDS,
     NORMAL_BALANCE_MEASURE_WAIT_SECONDS,
     NORMAL_BALANCE_FINAL_DISCHARGE_POWER_W,
     NORMAL_BALANCE_FINAL_DISCHARGE_STOP_CELL_VOLTAGE,
-    ACTIVE_BALANCE_TARGET_DELTA_V,
-    ACTIVE_BALANCE_CHARGE_RESUME_CELL_VOLTAGE,
-    ACTIVE_BALANCE_CHARGE_STOP_CELL_VOLTAGE,
-    ACTIVE_BALANCE_DISCHARGE_STOP_CELL_VOLTAGE,
-    ACTIVE_BALANCE_FINAL_DISCHARGE_STOP_CELL_VOLTAGE,
-    ACTIVE_BALANCE_MEASURE_WAIT_SECONDS,
-    ACTIVE_BALANCE_ADAPTIVE_RESUME_STEP_V,
-    ACTIVE_BALANCE_ADAPTIVE_MIN_RESUME_CELL_VOLTAGE,
-    ACTIVE_BALANCE_CHARGE_POWER_W,
-    ACTIVE_BALANCE_DISCHARGE_POWER_W,
-    ACTIVE_BALANCE_MODE_TARGET_DELTA_V,
     CONF_ACTIVE_BALANCE_MODE_ENABLED,
     CONF_FULL_CHARGE_VOLTAGE_TAPER_ENABLED,
     DEFAULT_FULL_CHARGE_VOLTAGE_TAPER_ENABLED,
@@ -233,8 +220,6 @@ class ChargeDischargeController:
         # Normal high-SOC charge protection. These must exist before the first
         # capacity calculation because _battery_power_limit() reads them.
         self._normal_balance_date = dt_util.now().date()
-        self._normal_balance_zone_seconds: dict[MarstekVenusDataUpdateCoordinator, float] = {}
-        self._normal_balance_last_tick: dict[MarstekVenusDataUpdateCoordinator, datetime] = {}
         self._normal_balance_charge_paused: dict[MarstekVenusDataUpdateCoordinator, bool] = {}
         self._normal_balance_voltage_tapered: dict[MarstekVenusDataUpdateCoordinator, bool] = {}
         self._normal_active_balance_phases: dict[MarstekVenusDataUpdateCoordinator, str] = {}
@@ -363,8 +348,7 @@ class ChargeDischargeController:
         # Weekly Full Charge state
         self.weekly_full_charge_enabled = config_entry.data.get(CONF_ENABLE_WEEKLY_FULL_CHARGE, False)
         self.weekly_full_charge_day = config_entry.data.get(CONF_WEEKLY_FULL_CHARGE_DAY, "sun")
-        self.weekly_full_charge_complete = False  # True when top-balancing has completed
-        self.weekly_full_charge_top_reached = False  # True after ALL batteries first reach 100%
+        self.weekly_full_charge_complete = False  # True when the weekly charge to 100% has completed
         self.last_checked_weekday = None  # Track day transitions for reset logic
         self.weekly_full_charge_registers_written = False  # True when register 44000 set to 100%
         self._weekly_charge_needs_restore = False  # True when day changed mid-charge and hardware restore is pending
@@ -562,14 +546,12 @@ class ChargeDischargeController:
         return min(power, self._effective_system_capacity(batteries, is_charging))
 
     def _normal_balance_reset_if_new_day(self) -> None:
-        """Reset normal-balance exposure counters at the local day boundary."""
+        """Reset normal-balance latched state at the local day boundary."""
         today = dt_util.now().date()
         if today == self._normal_balance_date:
             return
 
         self._normal_balance_date = today
-        self._normal_balance_zone_seconds.clear()
-        self._normal_balance_last_tick.clear()
         self._normal_balance_charge_paused.clear()
         self._normal_balance_voltage_tapered.clear()
         self._normal_active_balance_phases.clear()
@@ -577,8 +559,6 @@ class ChargeDischargeController:
         self._normal_balance_last_delta_v.clear()
         for coordinator in self.coordinators:
             self.remove_charge_block("normal_balance_pause", coordinator=coordinator)
-            self.remove_charge_block("normal_balance_daily_limit", coordinator=coordinator)
-        _LOGGER.info("Normal Balance Protection: daily high-SOC exposure counters reset")
 
     @staticmethod
     def _cell_delta_v(data: dict) -> float | None:
@@ -631,53 +611,31 @@ class ChargeDischargeController:
             return False
         return False
 
-    def _normal_balance_daily_limit_reached(self, coordinator) -> bool:
-        """Return True once this battery spent the daily budget in the top zone."""
-        return (
-            self._normal_balance_zone_seconds.get(coordinator, 0.0)
-            >= NORMAL_BALANCE_DAILY_MAX_SECONDS
-        )
-
     def _refresh_normal_balance_blocks(self) -> None:
         """Update normal high-SOC charge protection blockers.
 
-        The normal mode does not force charging. It only limits normal charge
-        current, pauses charge if a high cell runs away, and stops extending the
-        high-SOC window after the daily exposure budget is spent.
+        The normal mode does not force charging. It only pauses charge if a
+        high cell runs away during a 100% charge target, and resumes once the
+        cell relaxes below the resume threshold.
         """
-        now = dt_util.utcnow()
         self._normal_balance_reset_if_new_day()
 
         for coordinator in self.coordinators:
             data = coordinator.data or {}
             if not self._full_charge_voltage_taper_applies(coordinator):
-                self._normal_balance_last_tick.pop(coordinator, None)
                 self._normal_balance_charge_paused.pop(coordinator, None)
                 self._normal_balance_voltage_tapered.pop(coordinator, None)
                 self.remove_charge_block("normal_balance_pause", coordinator=coordinator)
-                self.remove_charge_block("normal_balance_daily_limit", coordinator=coordinator)
                 continue
 
             if not data:
-                self._normal_balance_last_tick.pop(coordinator, None)
                 self._normal_balance_charge_paused.pop(coordinator, None)
                 self._normal_balance_voltage_tapered.pop(coordinator, None)
                 self.remove_charge_block("normal_balance_pause", coordinator=coordinator)
-                self.remove_charge_block("normal_balance_daily_limit", coordinator=coordinator)
                 continue
 
             in_zone = self._normal_balance_zone_active(coordinator)
-            if in_zone:
-                last_tick = self._normal_balance_last_tick.get(coordinator)
-                if last_tick is not None:
-                    elapsed = max(0.0, (now - last_tick).total_seconds())
-                    elapsed = min(elapsed, NORMAL_BALANCE_MAX_TICK_SECONDS)
-                    self._normal_balance_zone_seconds[coordinator] = (
-                        self._normal_balance_zone_seconds.get(coordinator, 0.0) + elapsed
-                    )
-                self._normal_balance_last_tick[coordinator] = now
-            else:
-                self._normal_balance_last_tick.pop(coordinator, None)
+            if not in_zone:
                 self._normal_balance_voltage_tapered.pop(coordinator, None)
 
             vmax = data.get("max_cell_voltage")
@@ -714,36 +672,6 @@ class ChargeDischargeController:
                 self._normal_balance_charge_paused.pop(coordinator, None)
                 self.remove_charge_block("normal_balance_pause", coordinator=coordinator)
 
-            soc = data.get("battery_soc")
-            try:
-                soc_f = float(soc) if soc is not None else 0.0
-            except (TypeError, ValueError):
-                soc_f = 0.0
-
-            daily_limit_reached = (
-                in_zone
-                and not self._weekly_full_charge_unlocked()
-                and self._normal_balance_daily_limit_reached(coordinator)
-            )
-            if daily_limit_reached:
-                self.set_charge_block(
-                    "normal_balance_daily_limit",
-                    "daily_balance_limit",
-                    {
-                        "battery": coordinator.name,
-                        "soc": soc,
-                        "max_cell_voltage": vmax,
-                        "exposure_h": round(
-                            self._normal_balance_zone_seconds.get(coordinator, 0.0) / 3600,
-                            2,
-                        ),
-                        "daily_limit_h": round(NORMAL_BALANCE_DAILY_MAX_SECONDS / 3600, 2),
-                    },
-                    coordinator=coordinator,
-                )
-            else:
-                self.remove_charge_block("normal_balance_daily_limit", coordinator=coordinator)
-
     def get_normal_balance_status(self) -> dict:
         """Return normal-balance diagnostics for the integration status sensor."""
         status = {}
@@ -751,12 +679,9 @@ class ChargeDischargeController:
             data = coordinator.data or {}
             if not data:
                 continue
-            seconds = self._normal_balance_zone_seconds.get(coordinator, 0.0)
             status[coordinator.name] = {
                 "enabled": self._full_charge_voltage_taper_enabled(coordinator),
                 "in_zone": self._normal_balance_zone_active(coordinator),
-                "exposure_h": round(seconds / 3600, 2),
-                "daily_limit_h": round(NORMAL_BALANCE_DAILY_MAX_SECONDS / 3600, 2),
                 "paused": self._normal_balance_charge_paused.get(coordinator, False),
                 "max_cell_voltage": data.get("max_cell_voltage"),
                 "min_cell_voltage": data.get("min_cell_voltage"),
@@ -889,7 +814,6 @@ class ChargeDischargeController:
                     "max_soc",
                     "charge_hysteresis",
                     "normal_balance_pause",
-                    "normal_balance_daily_limit",
                 },
                 ignore_discharge_blockers={
                     "time_slot_discharge",
@@ -1011,7 +935,6 @@ class ChargeDischargeController:
                 _LOGGER.info("Weekly Full Charge: Mid-charge abort detected - hardware restore pending")
                 self._weekly_charge_needs_restore = True
             self.weekly_full_charge_complete = False
-            self.weekly_full_charge_top_reached = False
             self.weekly_full_charge_registers_written = False
         self.weekly_full_charge_enabled = new_weekly_enabled
         self.weekly_full_charge_day = new_weekly_day
@@ -5277,18 +5200,6 @@ class ChargeDischargeController:
         # Per-battery scheduled active balance mode has priority over global
         # modes. It owns only the selected battery; PD can still use the rest.
         await self._handle_active_balance_mode()
-
-        # Weekly full charge: once the top is reached, actively keep cells in
-        # the documented balancing window before returning to normal PD control.
-        if await self._weekly_charge_mgr.handle_active_balancing():
-            self.previous_power = 0
-            self.previous_sensor = None
-            self.previous_error = 0
-            self.last_output_sign = 0
-            self.sign_changes = 0
-            self._active_discharge_batteries = []
-            self._active_charge_batteries = []
-            return
 
         if await self._handle_normal_max_soc_active_balancing():
             self.previous_power = 0

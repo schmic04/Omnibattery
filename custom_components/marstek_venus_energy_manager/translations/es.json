@@ -835,7 +835,6 @@
           "idle": "Inactivo",
           "disabled": "Desactivado",
           "charging": "Cargando al 100%",
-          "active_balancing": "Balanceo activo",
           "complete": "Completado"
         }
       },

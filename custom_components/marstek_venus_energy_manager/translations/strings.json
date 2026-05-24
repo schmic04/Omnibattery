@@ -830,7 +830,6 @@
           "idle": "Idle",
           "disabled": "Disabled",
           "charging": "Charging to 100%",
-          "active_balancing": "Active balancing",
           "complete": "Complete"
         }
       },

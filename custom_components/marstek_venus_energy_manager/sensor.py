@@ -442,7 +442,6 @@ class WeeklyFullChargeSensor(SensorEntity):
             "Idle": "idle",
             "Disabled": "disabled",
             "Charging to 100%": "charging",
-            "Active balancing": "active_balancing",
             "Complete": "complete",
         }.get(state, "idle")
 
@@ -453,9 +452,6 @@ class WeeklyFullChargeSensor(SensorEntity):
             "weekly_charge_day": self._controller.weekly_full_charge_day,
             "charge_delay_enabled": self._controller.charge_delay_enabled,
         }
-        balance_status = self._controller._weekly_charge_mgr.get_active_balance_status()
-        if balance_status.get("active") or balance_status.get("batteries"):
-            attrs["active_balancing"] = balance_status
         completion_reason = self._controller._weekly_charge_status.get("completion_reason")
         if completion_reason:
             attrs["completion_reason"] = completion_reason

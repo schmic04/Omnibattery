@@ -820,7 +820,6 @@
           "idle": "Inactief",
           "disabled": "Uitgeschakeld",
           "charging": "Laden naar 100%",
-          "active_balancing": "Actief balanceren",
           "complete": "Voltooid"
         }
       },

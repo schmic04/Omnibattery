@@ -4,12 +4,14 @@ Owns:
 - Day-based activation logic (is_active)
 - Persistence of completion / registers-written across HA restarts
 - Hardware register (44000) writes to allow charging to 100% on v2 batteries
-- Completion detection (all batteries at 100%) and register restore
+- Completion detection (all batteries at 100% or BMS cutoff at 99%)
+- Register restore and hysteresis re-enable on completion
 - Mid-charge abort handling when day or feature flag changes
 
-Reads/writes the controller's existing public attributes for backward
-compatibility with sensors, switches and the balance monitor that read
-those attrs directly.
+Active cell balancing on weekly day is intentionally NOT handled here — that
+is the job of the per-battery Active Balance Mode. Weekly only charges to
+100%; the user enables Active Balance Mode separately when they want a full
+balance cycle.
 """
 from __future__ import annotations
 
@@ -20,15 +22,7 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.helpers.storage import Store
 
-from .const import (
-    ACTIVE_BALANCE_CHARGE_POWER_W,
-    ACTIVE_BALANCE_CHARGE_STOP_CELL_VOLTAGE,
-    ACTIVE_BALANCE_DISCHARGE_POWER_W,
-    ACTIVE_BALANCE_FINAL_DISCHARGE_STOP_CELL_VOLTAGE,
-    ACTIVE_BALANCE_MEASURE_WAIT_SECONDS,
-    DOMAIN,
-    WEEKDAY_MAP,
-)
+from .const import DOMAIN, WEEKDAY_MAP
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -62,18 +56,6 @@ class WeeklyFullChargeManager:
         self._store = Store(hass, 1, f"{DOMAIN}.{config_entry.entry_id}.weekly_charge_state")
         # Per-battery debounce counter for BMS-cutoff detection (in-memory only).
         self._bms_cutoff_counts: dict[str, int] = {}
-        self._balance_phases: dict[str, str] = {}
-        self._balance_measure_started_ts: dict[str, str] = {}
-        self._balance_last_delta_v: dict[str, float] = {}
-        self._balance_started_ts: str | None = None
-
-    def _reset_adaptive_charge_resume_targets(self) -> None:
-        """Clear per-battery adaptive retry points when weekly balancing ends."""
-        reset = getattr(self._controller, "_reset_active_balance_charge_resume_target", None)
-        if not callable(reset):
-            return
-        for coordinator in self._controller.coordinators:
-            reset(coordinator)
 
     @property
     def store(self) -> Store:
@@ -170,19 +152,10 @@ class WeeklyFullChargeManager:
                 _LOGGER.info("Weekly Full Charge: Exited %s, resetting flags for next week",
                             ctrl.weekly_full_charge_day.upper())
                 ctrl.weekly_full_charge_complete = False
-                ctrl.weekly_full_charge_top_reached = False
                 ctrl.weekly_full_charge_registers_written = False
                 ctrl._force_full_charge = False
-                self._balance_phases.clear()
-                self._balance_measure_started_ts.clear()
-                self._balance_last_delta_v.clear()
-                self._reset_adaptive_charge_resume_targets()
-                self._balance_started_ts = None
                 ctrl._weekly_charge_status["state"] = "Idle"
                 ctrl._weekly_charge_status.pop("completion_reason", None)
-                ctrl._weekly_charge_status.pop("active_balancing", None)
-                ctrl._weekly_charge_status.pop("active_balance_elapsed_h", None)
-                ctrl._weekly_charge_status.pop("active_balance_target_h", None)
                 # Save the cleared state asynchronously (don't await to avoid blocking)
                 asyncio.create_task(self.save_state())
 
@@ -230,12 +203,7 @@ class WeeklyFullChargeManager:
             # completion from being incorrectly restored on the same weekday next week)
             if stored_date == today_iso:
                 ctrl.weekly_full_charge_complete = data.get("complete", False)
-                ctrl.weekly_full_charge_top_reached = data.get("top_reached", False)
                 ctrl.weekly_full_charge_registers_written = data.get("registers_written", False)
-                self._balance_phases = data.get("balance_phases", {}) or {}
-                self._balance_measure_started_ts = data.get("balance_measure_started_ts", {}) or {}
-                self._balance_last_delta_v = data.get("balance_last_delta_v", {}) or {}
-                self._balance_started_ts = data.get("balance_started_ts")
                 # Restore visible status so the sensor reflects the correct state immediately.
                 # (handle_registers() will also correct it on the next tick, but this avoids
                 # a transient "Idle" flash and is correct for the "Complete" case too.)
@@ -246,10 +214,9 @@ class WeeklyFullChargeManager:
                 ctrl._charge_delay_unlocked = data.get("delay_unlocked", False)
                 ctrl._solar_t_start = data.get("solar_t_start")
                 _LOGGER.info(
-                    "Weekly Full Charge: Restored state - complete=%s, top_reached=%s, "
+                    "Weekly Full Charge: Restored state - complete=%s, "
                     "registers_written=%s, delay_unlocked=%s",
                     ctrl.weekly_full_charge_complete,
-                    ctrl.weekly_full_charge_top_reached,
                     ctrl.weekly_full_charge_registers_written,
                     ctrl._charge_delay_unlocked,
                 )
@@ -270,13 +237,8 @@ class WeeklyFullChargeManager:
             now = datetime.now()
             data = {
                 "complete": ctrl.weekly_full_charge_complete,
-                "top_reached": ctrl.weekly_full_charge_top_reached,
                 "registers_written": ctrl.weekly_full_charge_registers_written,
                 "state": ctrl._weekly_charge_status.get("state", "Idle"),
-                "balance_started_ts": self._balance_started_ts,
-                "balance_phases": dict(self._balance_phases),
-                "balance_measure_started_ts": dict(self._balance_measure_started_ts),
-                "balance_last_delta_v": dict(self._balance_last_delta_v),
                 "date": date.today().isoformat(),
                 "timestamp": now.isoformat(),
                 # Delay state (bundled in the same store for legacy reasons)
@@ -334,17 +296,8 @@ class WeeklyFullChargeManager:
                     _LOGGER.error("%s: Failed to restore charging cutoff register: %s", coordinator.name, e)
             ctrl._weekly_charge_saved_max_soc.clear()
             ctrl._weekly_charge_needs_restore = False
-            ctrl.weekly_full_charge_top_reached = False
-            self._balance_phases.clear()
-            self._balance_measure_started_ts.clear()
-            self._balance_last_delta_v.clear()
-            self._reset_adaptive_charge_resume_targets()
-            self._balance_started_ts = None
             ctrl._weekly_charge_status["state"] = "Idle"
-            ctrl._weekly_charge_status.pop("active_balancing", None)
             ctrl._weekly_charge_status.pop("completion_reason", None)
-            ctrl._weekly_charge_status.pop("active_balance_elapsed_h", None)
-            ctrl._weekly_charge_status.pop("active_balance_target_h", None)
 
         if not ctrl.weekly_full_charge_enabled and not ctrl._force_full_charge:
             return
@@ -405,233 +358,33 @@ class WeeklyFullChargeManager:
             ctrl.weekly_full_charge_registers_written = True
             ctrl._weekly_charge_status["state"] = "Charging to 100%"
             ctrl._weekly_charge_status.pop("completion_reason", None)
-            ctrl._weekly_charge_status.pop("active_balancing", None)
-            ctrl._weekly_charge_status.pop("active_balance_elapsed_h", None)
-            ctrl._weekly_charge_status.pop("active_balance_target_h", None)
             # Persist state so that the next restart can restore both registers_written
             # and the status field immediately.
             asyncio.create_task(self.save_state())
 
-        # Check if all batteries reached the top. This starts active cell
-        # balancing; completion is handled after the cells converge.
+        # Completion: when every battery is full, restore registers and mark done.
+        # Cell-level balancing on this day is the responsibility of Active Balance
+        # Mode (per-battery switch), not weekly.
         batteries_with_data = [
             c
             for c in ctrl.coordinators
             if c.data and not ctrl._is_active_balance_mode_running(c)
         ]
-        def _battery_at_top(c: Any) -> bool:
-            if self.is_battery_full(c):
-                return True
-            try:
-                vmax = float((c.data or {}).get("max_cell_voltage"))
-            except (TypeError, ValueError):
-                return False
-            return vmax >= ACTIVE_BALANCE_CHARGE_STOP_CELL_VOLTAGE
-
         all_batteries_full = bool(batteries_with_data) and all(
-            _battery_at_top(c)
-            for c in batteries_with_data
+            self.is_battery_full(c) for c in batteries_with_data
         )
 
-        if (
-            all_batteries_full
-            and not ctrl.weekly_full_charge_complete
-            and not ctrl.weekly_full_charge_top_reached
-        ):
-            ctrl.weekly_full_charge_top_reached = True
-            self._balance_started_ts = datetime.now().isoformat()
-            self._reset_adaptive_charge_resume_targets()
-            self._balance_phases = {
-                c.host: "WAIT_MEASURE"
-                for c in ctrl.coordinators
-                if c.data and not ctrl._is_active_balance_mode_running(c)
-            }
-            now_iso = datetime.now().isoformat()
-            self._balance_measure_started_ts = {
-                c.host: now_iso
-                for c in ctrl.coordinators
-                if c.data and not ctrl._is_active_balance_mode_running(c)
-            }
-            ctrl._weekly_charge_status["state"] = "Active balancing"
-            ctrl._weekly_charge_status.pop("completion_reason", None)
-            self._bms_cutoff_counts.clear()
-            _LOGGER.info(
-                "Weekly Full Charge: all batteries reached the top - starting active cell balancing"
-            )
-            await self.save_state()
+        if all_batteries_full and not ctrl.weekly_full_charge_complete:
+            await self._complete_weekly_charge("full_charge_complete")
 
-    def _weekly_balance_elapsed_seconds(self) -> float:
-        """Return elapsed seconds since weekly active balancing started."""
-        if not self._balance_started_ts:
-            return 0.0
-        try:
-            started = datetime.fromisoformat(self._balance_started_ts)
-        except (TypeError, ValueError):
-            return 0.0
-        return max(0.0, (datetime.now() - started).total_seconds())
-
-    async def handle_active_balancing(self) -> bool:
-        """Finish weekly full charge with a 60 s voltage measurement and final discharge."""
-        ctrl = self._controller
-        if (
-            not ctrl.weekly_full_charge_enabled
-            and not ctrl._force_full_charge
-        ):
-            return False
-        if (
-            ctrl.weekly_full_charge_complete
-            or not ctrl.weekly_full_charge_top_reached
-            or not self.is_active()
-        ):
-            return False
-
-        missing_cell_data = False
-        status: dict[str, dict[str, Any]] = {}
-        active_hosts: set[str] = set()
-
-        for coordinator in ctrl.coordinators:
-            data = coordinator.data or {}
-            if ctrl._is_active_balance_mode_running(coordinator):
-                continue
-            if not data:
-                continue
-            active_hosts.add(coordinator.host)
-
-            vmax = data.get("max_cell_voltage")
-            vmin = data.get("min_cell_voltage")
-            if vmax is None or vmin is None:
-                missing_cell_data = True
-                status[coordinator.name] = {
-                    "phase": "waiting_for_cell_voltage",
-                    "charge_w": 0,
-                    "discharge_w": 0,
-                }
-                await ctrl._set_battery_power(coordinator, 0, 0)
-                continue
-
-            try:
-                vmax_f = float(vmax)
-                vmin_f = float(vmin)
-            except (TypeError, ValueError):
-                missing_cell_data = True
-                status[coordinator.name] = {
-                    "phase": "waiting_for_cell_voltage",
-                    "charge_w": 0,
-                    "discharge_w": 0,
-                }
-                await ctrl._set_battery_power(coordinator, 0, 0)
-                continue
-
-            phase = self._balance_phases.get(coordinator.host, "WAIT_MEASURE")
-            charge_power = 0
-            discharge_power = 0
-            delta_v = round(vmax_f - vmin_f, 4)
-
-            if phase == "WAIT_MEASURE":
-                started_ts = self._balance_measure_started_ts.setdefault(
-                    coordinator.host,
-                    datetime.now().isoformat(),
-                )
-                try:
-                    started = datetime.fromisoformat(started_ts)
-                    elapsed = max(0.0, (datetime.now() - started).total_seconds())
-                except (TypeError, ValueError):
-                    elapsed = 0.0
-                if elapsed >= ACTIVE_BALANCE_MEASURE_WAIT_SECONDS:
-                    self._balance_last_delta_v[coordinator.host] = delta_v
-                    phase = "FINAL_DISCHARGE_25W"
-                    self._balance_phases[coordinator.host] = phase
-                    _LOGGER.info(
-                        "%s: weekly balance measurement delta=%.4f V at vmax=%.3f V",
-                        coordinator.name,
-                        delta_v,
-                        vmax_f,
-                    )
-            if phase == "FINAL_DISCHARGE_25W":
-                if vmax_f > ACTIVE_BALANCE_FINAL_DISCHARGE_STOP_CELL_VOLTAGE:
-                    discharge_power = ACTIVE_BALANCE_DISCHARGE_POWER_W
-                else:
-                    phase = "COMPLETE"
-                    self._balance_phases[coordinator.host] = phase
-                    await ctrl._set_battery_power(coordinator, 0, 0)
-            elif phase == "COMPLETE":
-                await ctrl._set_battery_power(coordinator, 0, 0)
-
-            status[coordinator.name] = {
-                "phase": phase.lower(),
-                "max_cell_voltage": round(vmax_f, 3),
-                "min_cell_voltage": round(vmin_f, 3),
-                "delta_V": delta_v,
-                "last_measure_delta_V": self._balance_last_delta_v.get(coordinator.host),
-                "charge_w": charge_power,
-                "discharge_w": discharge_power,
-            }
-
-            if phase not in {"COMPLETE"}:
-                await ctrl._set_battery_power(
-                    coordinator,
-                    charge_power,
-                    discharge_power,
-                    ignore_charge_blockers={
-                        "charge_delay",
-                        "time_slot_charge",
-                        "max_soc",
-                        "charge_hysteresis",
-                        "normal_balance_pause",
-                        "normal_balance_daily_limit",
-                        "user_battery_charge_disabled",
-                        "ev_pause",
-                    },
-                    ignore_discharge_blockers={
-                        "time_slot_discharge",
-                        "price_discharge",
-                        "min_soc",
-                        "user_battery_discharge_disabled",
-                        "ev_pause",
-                        "ev_charging",
-                    },
-                )
-
-        ctrl._weekly_charge_status["state"] = "Active balancing"
-        ctrl._weekly_charge_status["active_balancing"] = status
-
-        if active_hosts and all(
-            self._balance_phases.get(host) == "COMPLETE"
-            for host in active_hosts
-        ):
-            await self._complete_weekly_charge("voltage_balance_complete")
-            return True
-
-        if missing_cell_data:
-            _LOGGER.warning(
-                "Weekly Full Charge: cell-voltage data unavailable during active balancing; "
-                "holding output at 0W for affected batteries until data returns"
-            )
-
-        await self.save_state()
-        return True
     async def _complete_weekly_charge(self, reason: str) -> None:
         """Mark weekly full charge complete and restore configured limits."""
         ctrl = self._controller
         _LOGGER.info("Weekly Full Charge: Complete (%s) - reverting to configured limits", reason)
         ctrl.weekly_full_charge_complete = True
-        ctrl.weekly_full_charge_top_reached = False
         ctrl._weekly_charge_status["state"] = "Complete"
         ctrl._weekly_charge_status["completion_reason"] = reason
-        ctrl._weekly_charge_status.pop("active_balancing", None)
-        ctrl._weekly_charge_status.pop("active_balance_elapsed_h", None)
-        ctrl._weekly_charge_status.pop("active_balance_target_h", None)
         self._bms_cutoff_counts.clear()
-        self._balance_phases.clear()
-        self._balance_measure_started_ts.clear()
-        self._balance_last_delta_v.clear()
-        self._reset_adaptive_charge_resume_targets()
-        self._balance_started_ts = None
-
-        for coordinator in ctrl.coordinators:
-            if ctrl._is_active_balance_mode_running(coordinator):
-                continue
-            await ctrl._set_battery_power(coordinator, 0, 0)
 
         # Restore register 44000 to original max_soc values (v2 only).
         for coordinator in ctrl.coordinators:
@@ -676,14 +429,3 @@ class WeeklyFullChargeManager:
                 )
 
         await self.save_state()
-
-    def get_active_balance_status(self) -> dict[str, Any]:
-        """Return diagnostics for the current weekly active-balancing phase."""
-        return {
-            "active": self._controller.weekly_full_charge_top_reached,
-            "started": self._balance_started_ts,
-            "elapsed_h": round(self._weekly_balance_elapsed_seconds() / 3600, 2),
-            "phases": dict(self._balance_phases),
-            "last_delta_V": dict(self._balance_last_delta_v),
-            "batteries": dict(self._controller._weekly_charge_status.get("active_balancing", {})),
-        }

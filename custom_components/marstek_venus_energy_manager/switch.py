@@ -281,11 +281,9 @@ class BatteryFullChargeVoltageTaperSwitch(SwitchEntity):
         self.coordinator.persist_battery_config(CONF_FULL_CHARGE_VOLTAGE_TAPER_ENABLED, enabled)
 
     def _clear_runtime_state(self) -> None:
-        self.controller._normal_balance_last_tick.pop(self.coordinator, None)
         self.controller._normal_balance_charge_paused.pop(self.coordinator, None)
         self.controller._normal_balance_voltage_tapered.pop(self.coordinator, None)
         self.controller.remove_charge_block("normal_balance_pause", coordinator=self.coordinator)
-        self.controller.remove_charge_block("normal_balance_daily_limit", coordinator=self.coordinator)
 
     async def async_turn_on(self, **kwargs) -> None:
         self._persist(True)

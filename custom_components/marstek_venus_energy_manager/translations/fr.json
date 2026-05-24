@@ -820,7 +820,6 @@
           "idle": "Inactif",
           "disabled": "Désactivé",
           "charging": "Charge à 100%",
-          "active_balancing": "Equilibrage actif",
           "complete": "Terminé"
         }
       },

@@ -893,7 +893,6 @@ class ActiveBalanceModeManager:
                     "max_soc",
                     "charge_hysteresis",
                     "normal_balance_pause",
-                    "normal_balance_daily_limit",
                     "user_battery_charge_disabled",
                     "ev_pause",
                 },

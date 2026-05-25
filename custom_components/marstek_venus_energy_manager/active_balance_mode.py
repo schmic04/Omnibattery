@@ -213,8 +213,39 @@ class ActiveBalanceModeManager:
             )
 
     def _active_balance_mode_last_recorded_delta_v(self, coordinator) -> tuple[float | None, str]:
-        """Return the last stored cell-delta sensor value for active-balance context."""
-        return self._active_balance_mode_delta_v(coordinator), "instant"
+        """Return the last official 3.58 V balance measurement, else instant delta."""
+        delta, _vmax, _vmin, source = self._active_balance_mode_initial_snapshot(coordinator)
+        return delta, source
+
+    def _active_balance_mode_initial_snapshot(
+        self, coordinator
+    ) -> tuple[float | None, float | None, float | None, str]:
+        """Return (delta_V, vmax_V, vmin_V, source) for the start notification.
+
+        Prefers the last official 3.58 V balance measurement stored by the
+        BalanceMonitor so the start figures match a real cutoff reading.
+        Falls back to the current instant cell values if no measurement is
+        available (e.g. first ever run with empty history).
+        """
+        monitor = getattr(self._controller, "_balance_monitor", None)
+        if monitor is not None:
+            readings = monitor.get_recent_readings(coordinator.host, limit=1)
+            if readings:
+                last = readings[-1]
+                try:
+                    delta_mv = float(last.get("delta_mV"))
+                    vmax = float(last.get("vmax_V"))
+                    vmin = float(last.get("vmin_V"))
+                except (TypeError, ValueError):
+                    delta_mv = None
+                    vmax = None
+                    vmin = None
+                if delta_mv is not None and vmax is not None and vmin is not None:
+                    ts = last.get("ts")
+                    source = f"measurement_3.58V ({ts})" if ts else "measurement_3.58V"
+                    return delta_mv / 1000.0, vmax, vmin, source
+        vmax_f, vmin_f, delta_v = self._active_balance_mode_cell_values(coordinator)
+        return delta_v, vmax_f, vmin_f, "instant"
 
     def _format_active_balance_value(self, value, unit: str, decimals: int = 1) -> str:
         """Format optional numeric values for active-balance notifications."""
@@ -651,14 +682,11 @@ class ActiveBalanceModeManager:
                 coordinator.active_balance_mode_last_cutoff_max_cell_voltage = None
                 coordinator.active_balance_mode_last_cutoff_min_cell_voltage = None
                 coordinator.active_balance_mode_last_cutoff_soc = None
-                start_vmax, start_vmin, start_delta = self._active_balance_mode_cell_values(coordinator)
-                recorded_delta, recorded_delta_source = self._active_balance_mode_last_recorded_delta_v(coordinator)
-                coordinator.active_balance_mode_start_delta_mv = (
-                    recorded_delta if recorded_delta is not None else start_delta
+                start_delta, start_vmax, start_vmin, start_delta_source = (
+                    self._active_balance_mode_initial_snapshot(coordinator)
                 )
-                coordinator.active_balance_mode_start_delta_source = (
-                    recorded_delta_source if recorded_delta is not None else "instant"
-                )
+                coordinator.active_balance_mode_start_delta_mv = start_delta
+                coordinator.active_balance_mode_start_delta_source = start_delta_source
                 coordinator.active_balance_mode_start_max_cell_voltage = start_vmax
                 coordinator.active_balance_mode_start_min_cell_voltage = start_vmin
                 self._controller._persist_battery_runtime_config(

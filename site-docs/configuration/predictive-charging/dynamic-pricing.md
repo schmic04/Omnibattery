@@ -7,16 +7,19 @@ Automatically selects the **cheapest hours of the day** to cover the calculated 
 - **Nordpool**
 - **PVPC** (ESIOS REE, Spain)
 - **CKW** (Switzerland)
+- **EPEX Spot** (e.g. aWATTar)
+- **ENTSO-e** (Trnasparency Platform)
 
 ## Configuration
 
 | Field | Description |
 |---|---|
-| **Price integration type** | Nordpool / PVPC / CKW |
-| **Price sensor** | HA entity with the current price (and hourly forecast attributes) |
-| **Max price threshold** | (Optional) Price ceiling; does not charge even during "cheap" hours if the price exceeds this value. Also used as the discharge threshold when price-based discharge control is enabled |
-| **Contracted grid power (ICP)** | Grid limit used to calculate required charging duration |
+| **Price integration type** | Nordpool / PVPC / CKW / EPEX Spot / ENTSO-e |
+| **Electricity price sensor** | HA entity with the current price (and hourly forecast attributes) |
+| **Max price threshold (€)** | (Optional) Price ceiling; does not charge even during "cheap" hours if the price exceeds this value. Also used as the discharge threshold when price-based discharge control is enabled |
+| **Maximum contracted grid power ICP (W)** | Grid limit used to calculate required charging duration |
 | **Only discharge when price is above threshold** | (Optional) Price-gated discharge — see below |
+| **Solar forecast safety margin (kWh)** | (Optional) Extra energy buffer added to consumption forecast before deciding whether to charge (default 0 kWh) |
 
 ![Configuration form — Dynamic Pricing mode](../../assets/screenshots/configuration/predictive-charging/dynamic-pricing-form.png){ width="650"  style="display: block; margin: 0 auto;"}
 

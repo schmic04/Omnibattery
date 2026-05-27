@@ -8,10 +8,12 @@ Unlike Dynamic Pricing mode, it requires no price forecast and no overnight eval
 
 | Field | Description |
 |---|---|
-| **Price sensor** | Any HA sensor with the current period price (PVPC, Nordpool, CKW…) |
-| **Fixed price threshold** | Price below which grid charging activates |
+| **Electricity price sensor** | Any HA sensor with the current period price (PVPC, Nordpool, CKW…) |
+| **Maximum price threshold (€)** | (Optional) Price below which grid charging activates |
 | **Daily average price sensor** | (Optional) Dynamic threshold instead of a fixed value |
 | **Only discharge when price exceeds threshold** | (Optional) Price-gated discharge — see below |
+| **Maximum contracted power ICP (W)** | Maximum power when charging to avoid tripping the breaker (default 7000 W) |
+| **Solar forecast safety margin (kWh)** | Extra energy buffer added to the consumption forecast before deciding whether to charge (default 0 kWh) |
 
 ![Configuration form — Real-Time Price mode](../../assets/screenshots/configuration/predictive-charging/real-time-price-form.png){ width="650"  style="display: block; margin: 0 auto;"}
 
@@ -34,7 +36,7 @@ The energy balance (battery + solar vs. expected consumption) is evaluated befor
 The threshold is resolved in this priority order:
 
 1. **Daily average price sensor** — if configured and available, its value is the dynamic threshold.
-2. **Fixed price threshold** — static numeric value configured in the setup flow.
+2. **Maximum price threshold** — static numeric value configured in the setup flow.
 
 If neither is available, the mode does not act.
 

@@ -73,20 +73,58 @@
       },
       "add_time_slot": {
         "title": "Time slot {slot_num}",
-        "description": "Define a time slot where batteries will be ALLOWED to discharge. Outside this slot, they will not discharge.",
+        "description": "Define when and how the batteries are allowed to operate. The ticks control each direction, SOC and power. Manual mode forces an exact power, bypassing the PD algorithm.",
         "data": {
           "start_time": "Start time",
           "end_time": "End time",
           "days": "Days of the week",
-          "apply_to_charge": "Apply also to charging",
-          "target_grid_power": "Target Grid Power (W)"
+          "battery_scope": "Target battery",
+          "allow_charge": "Allow charge",
+          "allow_discharge": "Allow discharge",
+          "soc_override_enabled": "Override slot SOC max/min",
+          "power_override_enabled": "Override slot max charge/discharge power",
+          "mode": "Operation mode"
         },
         "data_description": {
-          "start_time": "Start time of the slot (24h format)",
-          "end_time": "End time of the slot (24h format)",
-          "days": "Days when this slot applies",
-          "apply_to_charge": "If checked, the slot will also restrict charging (battery will only charge during this slot)",
-          "target_grid_power": "Grid power the controller regulates toward during this slot. 0W = zero grid flow (default). Negative = slight export (e.g. -150W). Positive = allow slight import."
+          "start_time": "Slot start time (24h). Midnight crossing supported.",
+          "end_time": "Slot end time (24h).",
+          "days": "Days when this slot applies.",
+          "battery_scope": "Select 'all' to apply to every battery, or pick a specific one.",
+          "allow_charge": "If checked, charge is allowed during the slot. If NO slot allows charge, charge is unrestricted by default.",
+          "allow_discharge": "If checked, discharge is allowed during the slot. If NO slot allows discharge, discharge is unrestricted by default.",
+          "soc_override_enabled": "If checked, the slot overrides the battery max/min SOC inside the window.",
+          "power_override_enabled": "If checked, the slot limits or forces the max power.",
+          "mode": "PD: the predictive algorithm caps power using the slot value. Manual: forced discharge or charge at the configured power."
+        }
+      },
+      "add_time_slot_details": {
+        "title": "Slot {slot_num} details",
+        "description": "Configure SOC and/or power limits per battery. Every battery has its own sliders. Mapping: {battery_map}. SOC min range: 12–30%. SOC max range: 80–100%. Power range: 100 W up to each battery’s hardware max.",
+        "data": {
+          "battery_1__soc_min": "Battery 1 — Min SOC (%)",
+          "battery_1__soc_max": "Battery 1 — Max SOC (%)",
+          "battery_1__max_charge_power_w": "Battery 1 — Max charge power",
+          "battery_1__max_discharge_power_w": "Battery 1 — Max discharge power",
+          "battery_2__soc_min": "Battery 2 — Min SOC (%)",
+          "battery_2__soc_max": "Battery 2 — Max SOC (%)",
+          "battery_2__max_charge_power_w": "Battery 2 — Max charge power",
+          "battery_2__max_discharge_power_w": "Battery 2 — Max discharge power",
+          "battery_3__soc_min": "Battery 3 — Min SOC (%)",
+          "battery_3__soc_max": "Battery 3 — Max SOC (%)",
+          "battery_3__max_charge_power_w": "Battery 3 — Max charge power",
+          "battery_3__max_discharge_power_w": "Battery 3 — Max discharge power",
+          "battery_4__soc_min": "Battery 4 — Min SOC (%)",
+          "battery_4__soc_max": "Battery 4 — Max SOC (%)",
+          "battery_4__max_charge_power_w": "Battery 4 — Max charge power",
+          "battery_4__max_discharge_power_w": "Battery 4 — Max discharge power",
+          "battery_5__soc_min": "Battery 5 — Min SOC (%)",
+          "battery_5__soc_max": "Battery 5 — Max SOC (%)",
+          "battery_5__max_charge_power_w": "Battery 5 — Max charge power",
+          "battery_5__max_discharge_power_w": "Battery 5 — Max discharge power",
+          "battery_6__soc_min": "Battery 6 — Min SOC (%)",
+          "battery_6__soc_max": "Battery 6 — Max SOC (%)",
+          "battery_6__max_charge_power_w": "Battery 6 — Max charge power",
+          "battery_6__max_discharge_power_w": "Battery 6 — Max discharge power"
         }
       },
       "add_more_slots": {
@@ -427,20 +465,58 @@
       },
       "add_time_slot": {
         "title": "Time slot {slot_num}",
-        "description": "Define or modify a time slot where batteries will be ALLOWED to discharge.",
+        "description": "Define when and how the batteries are allowed to operate. The ticks control each direction, SOC and power. Manual mode forces an exact power, bypassing the PD algorithm.",
         "data": {
           "start_time": "Start time",
           "end_time": "End time",
           "days": "Days of the week",
-          "apply_to_charge": "Apply also to charging",
-          "target_grid_power": "Target Grid Power (W)"
+          "battery_scope": "Target battery",
+          "allow_charge": "Allow charge",
+          "allow_discharge": "Allow discharge",
+          "soc_override_enabled": "Override slot SOC max/min",
+          "power_override_enabled": "Override slot max charge/discharge power",
+          "mode": "Operation mode"
         },
         "data_description": {
-          "start_time": "Start time of the slot (24h format)",
-          "end_time": "End time of the slot (24h format)",
-          "days": "Days when this slot applies",
-          "apply_to_charge": "If checked, the slot will also restrict charging (battery will only charge during this slot)",
-          "target_grid_power": "Grid power the controller regulates toward during this slot. 0W = zero grid flow (default). Negative = slight export (e.g. -150W). Positive = allow slight import."
+          "start_time": "Slot start time (24h). Midnight crossing supported.",
+          "end_time": "Slot end time (24h).",
+          "days": "Days when this slot applies.",
+          "battery_scope": "Select 'all' to apply to every battery, or pick a specific one.",
+          "allow_charge": "If checked, charge is allowed during the slot. If NO slot allows charge, charge is unrestricted by default.",
+          "allow_discharge": "If checked, discharge is allowed during the slot. If NO slot allows discharge, discharge is unrestricted by default.",
+          "soc_override_enabled": "If checked, the slot overrides the battery max/min SOC inside the window.",
+          "power_override_enabled": "If checked, the slot limits or forces the max power.",
+          "mode": "PD: the predictive algorithm caps power using the slot value. Manual: forced discharge or charge at the configured power."
+        }
+      },
+      "add_time_slot_details": {
+        "title": "Slot {slot_num} details",
+        "description": "Configure SOC and/or power limits per battery. Every battery has its own sliders. Mapping: {battery_map}. SOC min range: 12–30%. SOC max range: 80–100%. Power range: 100 W up to each battery’s hardware max.",
+        "data": {
+          "battery_1__soc_min": "Battery 1 — Min SOC (%)",
+          "battery_1__soc_max": "Battery 1 — Max SOC (%)",
+          "battery_1__max_charge_power_w": "Battery 1 — Max charge power",
+          "battery_1__max_discharge_power_w": "Battery 1 — Max discharge power",
+          "battery_2__soc_min": "Battery 2 — Min SOC (%)",
+          "battery_2__soc_max": "Battery 2 — Max SOC (%)",
+          "battery_2__max_charge_power_w": "Battery 2 — Max charge power",
+          "battery_2__max_discharge_power_w": "Battery 2 — Max discharge power",
+          "battery_3__soc_min": "Battery 3 — Min SOC (%)",
+          "battery_3__soc_max": "Battery 3 — Max SOC (%)",
+          "battery_3__max_charge_power_w": "Battery 3 — Max charge power",
+          "battery_3__max_discharge_power_w": "Battery 3 — Max discharge power",
+          "battery_4__soc_min": "Battery 4 — Min SOC (%)",
+          "battery_4__soc_max": "Battery 4 — Max SOC (%)",
+          "battery_4__max_charge_power_w": "Battery 4 — Max charge power",
+          "battery_4__max_discharge_power_w": "Battery 4 — Max discharge power",
+          "battery_5__soc_min": "Battery 5 — Min SOC (%)",
+          "battery_5__soc_max": "Battery 5 — Max SOC (%)",
+          "battery_5__max_charge_power_w": "Battery 5 — Max charge power",
+          "battery_5__max_discharge_power_w": "Battery 5 — Max discharge power",
+          "battery_6__soc_min": "Battery 6 — Min SOC (%)",
+          "battery_6__soc_max": "Battery 6 — Max SOC (%)",
+          "battery_6__max_charge_power_w": "Battery 6 — Max charge power",
+          "battery_6__max_discharge_power_w": "Battery 6 — Max discharge power"
         }
       },
       "add_more_slots": {
@@ -781,6 +857,18 @@
       "active_batteries": {
         "name": "Active Batteries"
       },
+      "system_daily_solar_energy": {
+        "name": "Daily Solar Production"
+      },
+      "system_daily_home_energy": {
+        "name": "Daily Home Consumption"
+      },
+      "system_daily_grid_import_energy": {
+        "name": "Daily Grid Import"
+      },
+      "system_daily_grid_export_energy": {
+        "name": "Daily Grid Export"
+      },
       "non_responsive_batteries": {
         "name": "Non-Responsive Batteries"
       },
@@ -811,7 +899,9 @@
           "ev_charger_pause": "EV Charger Pause",
           "ev_discharge_blocked": "EV Discharge Blocked",
           "backup_mode": "Backup Mode",
+          "time_slot_manual": "Manual Time Slot",
           "no_discharge_slot": "No-Discharge Window",
+          "no_charge_slot": "No-Charge Window",
           "charging": "Charging",
           "discharging": "Discharging",
           "balanced": "Standby"

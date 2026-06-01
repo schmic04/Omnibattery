@@ -9,9 +9,11 @@ A diferencia del Modo Precio Dinámico, no requiere previsión de precios ni eva
 | Campo | Descripción |
 |---|---|
 | **Sensor de precio** | Cualquier sensor HA con el precio del periodo actual (PVPC, Nordpool, CKW…) |
-| **Umbral fijo de precio** | Precio por debajo del cual se activa la carga |
+| **Umbral máximo de precio (€)** | (Opcional) Precio por debajo del cual se activa la carga desde la red |
 | **Sensor de precio medio diario** | (Opcional) Umbral dinámico en lugar del valor fijo |
 | **Descargar solo cuando el precio supere el umbral** | (Opcional) Descarga condicionada al precio actual — ver abajo |
+| **Potencia máxima contratada ICP (W)** | Potencia máxima al cargar para evitar disparar el diferencial (por defecto 7000 W) |
+| **Margen de seguridad de previsión solar (kWh)** | Buffer de energía adicional añadido a la previsión de consumo antes de decidir si cargar (por defecto 0 kWh) |
 
 ![Formulario de configuración — Modo Precio en Tiempo Real](../../assets/screenshots/configuration/predictive-charging/real-time-price-form.png){ width="650"  style="display: block; margin: 0 auto;"}
 

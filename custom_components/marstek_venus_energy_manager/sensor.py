@@ -3,7 +3,11 @@ from __future__ import annotations
 
 import logging
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import (
+    SensorEntity,
+    SensorDeviceClass,
+    SensorStateClass,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
@@ -79,6 +83,10 @@ from .const import (
     DEFAULT_HOURLY_BALANCE_MAX_OFFSET_W,
     DEFAULT_HOURLY_BALANCE_DEADBAND_WH,
     DEFAULT_HOURLY_BALANCE_HYSTERESIS_W,
+    SLOT_BATTERY_SCOPE_ALL,
+    DEFAULT_SLOT_MODE,
+    DEFAULT_SLOT_ALLOW_CHARGE,
+    DEFAULT_SLOT_ALLOW_DISCHARGE,
 )
 from .coordinator import MarstekVenusDataUpdateCoordinator
 from .aggregate_sensors import AGGREGATE_SENSOR_DEFINITIONS, MarstekVenusAggregateSensor, DailyGridAtMinSocSensor, SystemAlarmSensor
@@ -113,10 +121,11 @@ async def async_setup_entry(
         for definition in sensor_defs:
             entities.append(MarstekVenusSensor(coordinator, definition))
 
-    # Add aggregate sensors if there are multiple batteries
-    if len(coordinators) > 1:
-        for definition in AGGREGATE_SENSOR_DEFINITIONS:
-            entities.append(MarstekVenusAggregateSensor(coordinators, definition, entry, hass))
+    # Add aggregate sensors. Created even for a single-battery system so the
+    # "Marstek Venus System" device never exposes `unavailable` entities — with
+    # one battery each aggregate simply mirrors that battery's value.
+    for definition in AGGREGATE_SENSOR_DEFINITIONS:
+        entities.append(MarstekVenusAggregateSensor(coordinators, definition, entry, hass))
 
     # System alarm sensor — only for v2 batteries (only version with alarm/fault registers)
     v2_coordinators = [c for c in coordinators if c.battery_version == "v2"]
@@ -135,9 +144,12 @@ async def async_setup_entry(
     # Add discharge window diagnostic sensor (always, even without slots)
     entities.append(DischargeWindowSensor(hass, entry))
 
-    # Add active batteries diagnostic sensor (only with multiple batteries)
+    # Add active batteries diagnostic sensor. The controller updates its
+    # load-sharing tracking even for a single battery (see
+    # _select_batteries_for_operation), so this reflects charging/discharging/idle
+    # instead of staying unavailable.
     controller = hass.data[DOMAIN][entry.entry_id].get("controller")
-    if controller and len(coordinators) > 1:
+    if controller:
         entities.append(ActiveBatteriesSensor(hass, entry, controller, coordinators))
 
     # Add weekly full charge status sensor (when weekly charge is enabled)
@@ -163,6 +175,18 @@ async def async_setup_entry(
     # Add daily grid-at-min-soc energy sensor (feeds into consumption estimation)
     if controller:
         entities.append(DailyGridAtMinSocSensor(controller))
+
+    # Exact daily energy totals from the real power sensors (panel "Energía hoy").
+    # Each is added only when its source sensor is configured.
+    if controller and getattr(controller, "solar_production_sensor", None):
+        entities.append(DailySolarEnergySensor(controller))
+    if controller and getattr(controller, "household_consumption_sensor", None):
+        entities.append(DailyHomeEnergySensor(controller))
+    # Grid import/export are sign-split from the net consumption meter, which is
+    # always configured, so these are always added.
+    if controller and getattr(controller, "consumption_sensor", None):
+        entities.append(DailyGridImportEnergySensor(controller))
+        entities.append(DailyGridExportEnergySensor(controller))
 
 
 
@@ -270,7 +294,12 @@ class DischargeWindowSensor(SensorEntity):
         from datetime import datetime, time as dt_time
 
         all_slots = self.entry.data.get("no_discharge_time_slots", [])
-        enabled_slots = [s for s in all_slots if s.get("enabled", True)]
+        # Only slots that govern discharge define a discharge window. Charge-only
+        # slots (allow_discharge=False) leave discharge unrestricted.
+        enabled_slots = [
+            s for s in all_slots
+            if s.get("enabled", True) and s.get("allow_discharge", DEFAULT_SLOT_ALLOW_DISCHARGE)
+        ]
 
         if not enabled_slots:
             return "no_slots"
@@ -296,7 +325,10 @@ class DischargeWindowSensor(SensorEntity):
     def extra_state_attributes(self) -> dict:
         """Return configuration details of all time slots."""
         all_slots = self.entry.data.get("no_discharge_time_slots", [])
-        enabled_slots = [s for s in all_slots if s.get("enabled", True)]
+        enabled_slots = [
+            s for s in all_slots
+            if s.get("enabled", True) and s.get("allow_discharge", DEFAULT_SLOT_ALLOW_DISCHARGE)
+        ]
         attrs = {
             "slots_configured": len(enabled_slots),
         }
@@ -330,7 +362,10 @@ class DischargeWindowSensor(SensorEntity):
             attrs[f"slot_{n}_schedule"] = f"{slot.get('start_time', '??')}-{slot.get('end_time', '??')}"
             attrs[f"slot_{n}_days"] = days_str
             attrs[f"slot_{n}_enabled"] = slot.get("enabled", True)
-            attrs[f"slot_{n}_apply_to_charge"] = slot.get("apply_to_charge", False)
+            attrs[f"slot_{n}_mode"] = slot.get("mode", DEFAULT_SLOT_MODE)
+            attrs[f"slot_{n}_battery_scope"] = slot.get("battery_scope", SLOT_BATTERY_SCOPE_ALL)
+            attrs[f"slot_{n}_allow_charge"] = slot.get("allow_charge", DEFAULT_SLOT_ALLOW_CHARGE)
+            attrs[f"slot_{n}_allow_discharge"] = slot.get("allow_discharge", DEFAULT_SLOT_ALLOW_DISCHARGE)
 
         return attrs
 
@@ -673,9 +708,15 @@ class ConfigurationSummarySensor(SensorEntity):
             attrs[f"slot_{n}_schedule"] = f"{slot.get('start_time')}-{slot.get('end_time')}"
             attrs[f"slot_{n}_days"] = self._format_days(slot.get("days", []))
             attrs[f"slot_{n}_enabled"] = slot.get("enabled", True)
-            attrs[f"slot_{n}_apply_to_charge"] = slot.get("apply_to_charge", False)
-            if "target_grid_power" in slot:
-                attrs[f"slot_{n}_target_grid_power_W"] = slot.get("target_grid_power")
+            attrs[f"slot_{n}_mode"] = slot.get("mode", DEFAULT_SLOT_MODE)
+            attrs[f"slot_{n}_battery_scope"] = slot.get("battery_scope", SLOT_BATTERY_SCOPE_ALL)
+            attrs[f"slot_{n}_allow_charge"] = slot.get("allow_charge", DEFAULT_SLOT_ALLOW_CHARGE)
+            attrs[f"slot_{n}_allow_discharge"] = slot.get("allow_discharge", DEFAULT_SLOT_ALLOW_DISCHARGE)
+            attrs[f"slot_{n}_soc_override_enabled"] = slot.get("soc_override_enabled", False)
+            attrs[f"slot_{n}_power_override_enabled"] = slot.get("power_override_enabled", False)
+            battery_limits = slot.get("battery_limits") or {}
+            if battery_limits:
+                attrs[f"slot_{n}_battery_limits"] = battery_limits
 
         # --- Predictive charging ---
         predictive_enabled = data.get(CONF_ENABLE_PREDICTIVE_CHARGING, False)
@@ -855,31 +896,26 @@ class IntegrationStatusSensor(SensorEntity):
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
         self._attr_should_poll = True
 
-    def _is_outside_discharge_window(self) -> bool:
-        """Return True if discharge is currently blocked by time slot configuration.
+    def _time_slot_blocked(self, direction: str) -> bool:
+        """Return True when a time-slot whitelist blocks `direction` on every battery.
 
-        Time slots define WHEN discharge is allowed. If slots are configured and
-        the current time is outside all of them, discharge is blocked.
+        Time-slot blockers are stored per-battery (`time_slot_charge` /
+        `time_slot_discharge`), so the system-level status only reports the
+        restriction when no available battery can act in that direction.
         """
-        from datetime import datetime, time as dt_time
-        all_slots = self.entry.data.get("no_discharge_time_slots", [])
-        enabled_slots = [s for s in all_slots if s.get("enabled", True)]
-        if not enabled_slots:
-            return False  # No slots → discharge always allowed
-        now = datetime.now()
-        current_time = now.time()
-        current_day = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"][now.weekday()]
-        for slot in enabled_slots:
-            if current_day not in slot.get("days", []):
-                continue
-            try:
-                start = dt_time.fromisoformat(slot["start_time"])
-                end = dt_time.fromisoformat(slot["end_time"])
-            except Exception:
-                continue
-            if start <= current_time <= end:
-                return False  # Inside a discharge window → allowed
-        return True  # Outside all windows → blocked
+        c = self._controller
+        if direction == "discharge":
+            getter, key = c.get_discharge_blockers, "time_slot_discharge"
+        else:
+            getter, key = c.get_charge_blockers, "time_slot_charge"
+        coordinators = [
+            coordinator
+            for coordinator in c.coordinators
+            if getattr(coordinator, "is_available", True)
+        ]
+        if not coordinators:
+            return False
+        return all(key in getter(coordinator) for coordinator in coordinators)
 
     def _hourly_balance_state_key(self) -> str | None:
         """Return the integration-status key for hourly net balance activity."""
@@ -1002,11 +1038,17 @@ class IntegrationStatusSensor(SensorEntity):
         if self._backup_cooldown_batteries():
             return "backup_mode"
 
-        # Priority 6: Outside all configured discharge windows
-        if "time_slot_discharge" in discharge_blockers:
-            return "no_discharge_slot"
+        # Priority 6: Manual time slot forcing batteries off the PD path
+        if getattr(c, "_manual_slot_owned", None):
+            return "time_slot_manual"
 
-        # Priority 7: PD control state from last command
+        # Priority 7: Outside all configured operating windows
+        if self._time_slot_blocked("discharge"):
+            return "no_discharge_slot"
+        if self._time_slot_blocked("charge"):
+            return "no_charge_slot"
+
+        # Priority 8: PD control state from last command
         if c.first_execution:
             return "initializing"
 
@@ -1169,6 +1211,156 @@ class NonResponsiveBatteriesSensor(SensorEntity):
                     "consecutive_failures": getattr(coordinator, "_consecutive_failures", 0),
                 }
         return attrs
+
+    @property
+    def device_info(self):
+        """Return device information for the system."""
+        return {
+            "identifiers": {(DOMAIN, "marstek_venus_system")},
+            "name": "Marstek Venus System",
+            "manufacturer": "Marstek",
+            "model": "Venus Multi-Battery System",
+        }
+
+
+class DailySolarEnergySensor(SensorEntity):
+    """Exact daily solar production (kWh), integrated from the real solar power sensor.
+
+    The controller integrates the configured solar_production_sensor at control-loop
+    cadence and resets at local midnight (see ConsumptionTracker); this entity just
+    surfaces that running total. total_increasing so HA handles the daily reset.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "system_daily_solar_energy"
+    _attr_unique_id = "marstek_venus_system_daily_solar_energy"
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_native_unit_of_measurement = "kWh"
+    _attr_suggested_display_precision = 2
+    _attr_icon = "mdi:solar-power"
+    _attr_should_poll = True
+
+    def __init__(self, controller) -> None:
+        """Initialize the daily solar energy sensor."""
+        self._controller = controller
+
+    @property
+    def native_value(self) -> float:
+        """Return today's accumulated solar production in kWh."""
+        return round(self._controller._daily_solar_energy_kwh, 2)
+
+    @property
+    def device_info(self):
+        """Return device information for the system."""
+        return {
+            "identifiers": {(DOMAIN, "marstek_venus_system")},
+            "name": "Marstek Venus System",
+            "manufacturer": "Marstek",
+            "model": "Venus Multi-Battery System",
+        }
+
+
+class DailyHomeEnergySensor(SensorEntity):
+    """Exact daily home consumption (kWh), integrated from the real household power sensor.
+
+    Mirrors DailySolarEnergySensor but for the household_consumption_sensor. Unlike the
+    predictive-charging windowed accumulator, this integrates the full 24 h.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "system_daily_home_energy"
+    _attr_unique_id = "marstek_venus_system_daily_home_energy"
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_native_unit_of_measurement = "kWh"
+    _attr_suggested_display_precision = 2
+    _attr_icon = "mdi:home-lightning-bolt"
+    _attr_should_poll = True
+
+    def __init__(self, controller) -> None:
+        """Initialize the daily home energy sensor."""
+        self._controller = controller
+
+    @property
+    def native_value(self) -> float:
+        """Return today's accumulated home consumption in kWh."""
+        return round(self._controller._daily_home_energy_kwh, 2)
+
+    @property
+    def device_info(self):
+        """Return device information for the system."""
+        return {
+            "identifiers": {(DOMAIN, "marstek_venus_system")},
+            "name": "Marstek Venus System",
+            "manufacturer": "Marstek",
+            "model": "Venus Multi-Battery System",
+        }
+
+
+class DailyGridImportEnergySensor(SensorEntity):
+    """Exact daily grid import (kWh), integrated from the net consumption meter.
+
+    The controller integrates the positive half of the consumption_sensor (power
+    drawn FROM the grid) at control-loop cadence and resets at local midnight
+    (see ConsumptionTracker); this entity surfaces that running total.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "system_daily_grid_import_energy"
+    _attr_unique_id = "marstek_venus_system_daily_grid_import_energy"
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_native_unit_of_measurement = "kWh"
+    _attr_suggested_display_precision = 2
+    _attr_icon = "mdi:transmission-tower-import"
+    _attr_should_poll = True
+
+    def __init__(self, controller) -> None:
+        """Initialize the daily grid import energy sensor."""
+        self._controller = controller
+
+    @property
+    def native_value(self) -> float:
+        """Return today's accumulated grid import in kWh."""
+        return round(self._controller._daily_grid_import_energy_kwh, 2)
+
+    @property
+    def device_info(self):
+        """Return device information for the system."""
+        return {
+            "identifiers": {(DOMAIN, "marstek_venus_system")},
+            "name": "Marstek Venus System",
+            "manufacturer": "Marstek",
+            "model": "Venus Multi-Battery System",
+        }
+
+
+class DailyGridExportEnergySensor(SensorEntity):
+    """Exact daily grid export (kWh), integrated from the net consumption meter.
+
+    Mirrors DailyGridImportEnergySensor but for the negative half of the
+    consumption_sensor (power fed TO the grid).
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "system_daily_grid_export_energy"
+    _attr_unique_id = "marstek_venus_system_daily_grid_export_energy"
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_native_unit_of_measurement = "kWh"
+    _attr_suggested_display_precision = 2
+    _attr_icon = "mdi:transmission-tower-export"
+    _attr_should_poll = True
+
+    def __init__(self, controller) -> None:
+        """Initialize the daily grid export energy sensor."""
+        self._controller = controller
+
+    @property
+    def native_value(self) -> float:
+        """Return today's accumulated grid export in kWh."""
+        return round(self._controller._daily_grid_export_energy_kwh, 2)
 
     @property
     def device_info(self):

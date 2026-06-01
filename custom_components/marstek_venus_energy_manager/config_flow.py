@@ -11,6 +11,7 @@ from homeassistant.core import callback
 from homeassistant.config_entries import ConfigFlow, OptionsFlow, ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT
 from homeassistant.data_entry_flow import FlowResult
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.selector import (
     NumberSelector,
     NumberSelectorConfig,
@@ -32,6 +33,7 @@ from .const import (
     CONF_ENABLE_PREDICTIVE_CHARGING,
     CONF_CHARGING_TIME_SLOT,
     CONF_SOLAR_FORECAST_SENSOR,
+    CONF_SOLAR_PRODUCTION_SENSOR,
     CONF_HOUSEHOLD_CONSUMPTION_SENSOR,
     CONF_MAX_CONTRACTED_POWER,
     CONF_ENABLE_WEEKLY_FULL_CHARGE,
@@ -96,6 +98,17 @@ from .const import (
     DEFAULT_PREDICTIVE_SAFETY_MARGIN_KWH,
     CONF_FULL_CHARGE_VOLTAGE_TAPER_ENABLED,
     DEFAULT_FULL_CHARGE_VOLTAGE_TAPER_ENABLED,
+    SLOT_BATTERY_SCOPE_ALL,
+    SLOT_MODE_PD,
+    SLOT_MODE_MANUAL,
+    DEFAULT_SLOT_ALLOW_CHARGE,
+    DEFAULT_SLOT_ALLOW_DISCHARGE,
+    DEFAULT_SLOT_SOC_OVERRIDE_ENABLED,
+    DEFAULT_SLOT_POWER_OVERRIDE_ENABLED,
+    DEFAULT_SLOT_MODE,
+    DEFAULT_SLOT_SOC_MIN_FLOOR,
+    DEFAULT_SLOT_SOC_MAX_CEILING,
+    MAX_TIME_SLOTS,
 )
 from .modbus_client import MarstekModbusClient
 
@@ -115,10 +128,18 @@ def _time_ranges_overlap(start1: str, end1: str, start2: str, end2: str) -> bool
 
 
 def _slots_overlap(new_slot: dict, existing_slots: list[dict]) -> bool:
-    """Check if new_slot overlaps with any existing slot on shared days."""
+    """Check if new_slot overlaps with any existing slot on shared days and scope.
+
+    Two slots only conflict when they would compete for the same battery: either
+    they share a concrete battery_scope, or one (or both) targets all batteries.
+    """
     new_days = set(new_slot.get("days", []))
+    new_scope = new_slot.get("battery_scope", SLOT_BATTERY_SCOPE_ALL)
     for slot in existing_slots:
         if not (new_days & set(slot.get("days", []))):
+            continue
+        scope = slot.get("battery_scope", SLOT_BATTERY_SCOPE_ALL)
+        if scope != SLOT_BATTERY_SCOPE_ALL and new_scope != SLOT_BATTERY_SCOPE_ALL and scope != new_scope:
             continue
         if _time_ranges_overlap(
             new_slot["start_time"], new_slot["end_time"],
@@ -128,10 +149,269 @@ def _slots_overlap(new_slot: dict, existing_slots: list[dict]) -> bool:
     return False
 
 
+def _battery_scope_options(battery_configs: list[dict]) -> list[dict]:
+    """Build battery scope selector options as {value, label} dicts.
+
+    The label shows the user-facing battery name (CONF_NAME) when available,
+    falling back to "Battery N" if the config dict has no name.
+    """
+    opts: list[dict] = [{"value": SLOT_BATTERY_SCOPE_ALL, "label": "All batteries"}]
+    for i, bcfg in enumerate(battery_configs or []):
+        name = bcfg.get(CONF_NAME) or f"Battery {i + 1}"
+        opts.append({"value": f"battery_{i + 1}", "label": name})
+    return opts
+
+
+def _scope_value_in_options(scope: str, opts: list[dict]) -> bool:
+    return any(o["value"] == scope for o in opts)
+
+
+def _battery_hardware_max(bcfg: dict) -> int:
+    """Return the battery's hardware max power (W) from MAX_POWER_BY_VERSION."""
+    version = bcfg.get(CONF_BATTERY_VERSION, DEFAULT_VERSION)
+    return int(MAX_POWER_BY_VERSION.get(version, 2500))
+
+
+def _max_system_hardware_power(battery_configs: list[dict]) -> int:
+    """Highest hardware power cap across configured batteries (W)."""
+    if not battery_configs:
+        return 2500
+    return max(_battery_hardware_max(b) for b in battery_configs)
+
+
+def _scoped_battery_index(scope: str) -> int | None:
+    """Parse "battery_N" → N-1. Returns None for "all" or invalid scope."""
+    if not scope or scope == SLOT_BATTERY_SCOPE_ALL or not scope.startswith("battery_"):
+        return None
+    try:
+        return int(scope.split("_", 1)[1]) - 1
+    except (ValueError, IndexError):
+        return None
+
+
+def _scoped_battery_config(scope: str, battery_configs: list[dict]) -> dict:
+    """Return the battery dict for `scope` (or {} for 'all' / invalid index)."""
+    idx = _scoped_battery_index(scope)
+    if idx is None:
+        return {}
+    if 0 <= idx < len(battery_configs):
+        return battery_configs[idx]
+    return {}
+
+
+def _slot_target_indices(scope: str, num_batteries: int) -> list[int]:
+    """Battery indices (0-based) covered by `scope`. Empty if scope invalid."""
+    if scope == SLOT_BATTERY_SCOPE_ALL:
+        return list(range(num_batteries))
+    idx = _scoped_battery_index(scope)
+    if idx is None or idx < 0 or idx >= num_batteries:
+        return []
+    return [idx]
+
+
+def _battery_scope_name_map(battery_configs: list[dict]) -> str:
+    """Human-readable list of 'battery_N → name' for description_placeholders."""
+    parts = []
+    for i, bcfg in enumerate(battery_configs or []):
+        parts.append(f"battery_{i + 1} = {bcfg.get(CONF_NAME) or f'Battery {i + 1}'}")
+    return ", ".join(parts) if parts else ""
+
+
+def _clamp(val: int, low: int, high: int) -> int:
+    return max(low, min(high, int(val)))
+
+
+def _slot_field_key(battery_idx: int, field: str) -> str:
+    """Step B form key: '<batteryN>__<field>'. Parsed back in _finalize_slot."""
+    return f"battery_{battery_idx + 1}__{field}"
+
+
+def _build_slot_step_a_schema(battery_configs: list[dict], defaults: dict) -> vol.Schema:
+    """Step A: time, days, scope, allow ticks, SOC tick, power tick, mode."""
+    scope_opts = _battery_scope_options(battery_configs)
+    scope_default = defaults.get("battery_scope") or SLOT_BATTERY_SCOPE_ALL
+    if not _scope_value_in_options(scope_default, scope_opts):
+        scope_default = SLOT_BATTERY_SCOPE_ALL
+    return vol.Schema({
+        vol.Required("start_time", default=defaults.get("start_time") or "00:00:00"): TimeSelector(),
+        vol.Required("end_time", default=defaults.get("end_time") or "00:00:00"): TimeSelector(),
+        vol.Required("days", default=defaults.get("days") or ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]):
+            SelectSelector(SelectSelectorConfig(
+                options=["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+                translation_key="weekday",
+                multiple=True,
+                mode=SelectSelectorMode.DROPDOWN,
+            )),
+        vol.Required("battery_scope", default=scope_default):
+            SelectSelector(SelectSelectorConfig(
+                options=scope_opts,
+                multiple=False,
+                mode=SelectSelectorMode.DROPDOWN,
+            )),
+        vol.Required("allow_charge", default=bool(defaults.get("allow_charge", DEFAULT_SLOT_ALLOW_CHARGE))): bool,
+        vol.Required("allow_discharge", default=bool(defaults.get("allow_discharge", DEFAULT_SLOT_ALLOW_DISCHARGE))): bool,
+        vol.Required("soc_override_enabled", default=bool(defaults.get("soc_override_enabled", DEFAULT_SLOT_SOC_OVERRIDE_ENABLED))): bool,
+        vol.Required("power_override_enabled", default=bool(defaults.get("power_override_enabled", DEFAULT_SLOT_POWER_OVERRIDE_ENABLED))): bool,
+        vol.Required("mode", default=defaults.get("mode") or DEFAULT_SLOT_MODE):
+            SelectSelector(SelectSelectorConfig(
+                options=[SLOT_MODE_PD, SLOT_MODE_MANUAL],
+                translation_key="slot_mode",
+                multiple=False,
+                mode=SelectSelectorMode.LIST,
+            )),
+    })
+
+
+def _build_slot_step_b_schema(
+    needs_soc: bool,
+    needs_power: bool,
+    scope: str,
+    battery_configs: list[dict],
+    defaults: dict,
+) -> vol.Schema:
+    """Step B: optional SOC and/or power values, rendered per-battery.
+
+    For each battery covered by `scope` (one for `battery_N`, all for `all`),
+    render an independent set of fields keyed as `battery_<idx>__<field>`. The
+    consumer (`_finalize_slot`) parses these into `slot["battery_limits"]`.
+
+      - SOC sliders always range [12, 100].
+      - Power sliders range [100, battery hardware max] per that specific battery.
+      - Defaults pull from the slot's previous `battery_limits[battery_N]` if any,
+        else from the battery's user-configured `min_soc`/`max_soc`/
+        `max_charge_power`/`max_discharge_power`.
+    """
+    fields: dict = {}
+    indices = _slot_target_indices(scope, len(battery_configs))
+    prior = defaults.get("battery_limits") or {}
+    for idx in indices:
+        bcfg = battery_configs[idx]
+        b_key = f"battery_{idx + 1}"
+        b_prior = prior.get(b_key) or {}
+        hw_max = _battery_hardware_max(bcfg)
+        if needs_soc:
+            soc_min_def = b_prior.get("soc_min") or int(bcfg.get("min_soc") or DEFAULT_SLOT_SOC_MIN_FLOOR)
+            soc_max_def = b_prior.get("soc_max") or int(bcfg.get("max_soc") or DEFAULT_SLOT_SOC_MAX_CEILING)
+            fields[vol.Required(
+                _slot_field_key(idx, "soc_min"),
+                default=_clamp(soc_min_def, DEFAULT_SLOT_SOC_MIN_FLOOR, 30),
+            )] = NumberSelector(NumberSelectorConfig(
+                min=DEFAULT_SLOT_SOC_MIN_FLOOR, max=30,
+                step=1, mode=NumberSelectorMode.SLIDER,
+            ))
+            fields[vol.Required(
+                _slot_field_key(idx, "soc_max"),
+                default=_clamp(soc_max_def, 80, DEFAULT_SLOT_SOC_MAX_CEILING),
+            )] = NumberSelector(NumberSelectorConfig(
+                min=80, max=DEFAULT_SLOT_SOC_MAX_CEILING,
+                step=1, mode=NumberSelectorMode.SLIDER,
+            ))
+        if needs_power:
+            charge_def = b_prior.get("max_charge_power_w") or int(bcfg.get("max_charge_power") or hw_max)
+            discharge_def = b_prior.get("max_discharge_power_w") or int(bcfg.get("max_discharge_power") or hw_max)
+            fields[vol.Required(
+                _slot_field_key(idx, "max_charge_power_w"),
+                default=_clamp(charge_def, 100, hw_max),
+            )] = NumberSelector(NumberSelectorConfig(
+                min=100, max=hw_max, step=50, unit_of_measurement="W",
+                mode=NumberSelectorMode.SLIDER,
+            ))
+            fields[vol.Required(
+                _slot_field_key(idx, "max_discharge_power_w"),
+                default=_clamp(discharge_def, 100, hw_max),
+            )] = NumberSelector(NumberSelectorConfig(
+                min=100, max=hw_max, step=50, unit_of_measurement="W",
+                mode=NumberSelectorMode.SLIDER,
+            ))
+    return vol.Schema(fields)
+
+
+def _validate_slot_step_a(user_input: dict) -> dict:
+    """Cross-field validation for step A. Returns errors dict (empty if valid)."""
+    errors: dict = {}
+    allow_c = bool(user_input.get("allow_charge"))
+    allow_d = bool(user_input.get("allow_discharge"))
+    if not (allow_c or allow_d):
+        errors["base"] = "slot_does_nothing"
+        return errors
+    if user_input.get("mode") == SLOT_MODE_MANUAL and not user_input.get("power_override_enabled"):
+        errors["base"] = "manual_requires_power"
+        return errors
+    if user_input["start_time"] >= user_input["end_time"]:
+        errors["base"] = "midnight_crossing"
+        return errors
+    return errors
+
+
+def _parse_step_b_battery_limits(step_b: dict | None) -> dict[str, dict]:
+    """Group step B form fields by battery key.
+
+    Field keys are encoded as `battery_<N>__<field>` (see _slot_field_key). The
+    returned dict maps `battery_N` → `{soc_min, soc_max, max_charge_power_w,
+    max_discharge_power_w}`, with int values. Missing fields are omitted.
+    """
+    if not step_b:
+        return {}
+    out: dict[str, dict] = {}
+    for key, val in step_b.items():
+        if "__" not in key:
+            continue
+        b_key, field = key.split("__", 1)
+        if not b_key.startswith("battery_"):
+            continue
+        if val is None:
+            continue
+        try:
+            out.setdefault(b_key, {})[field] = int(val)
+        except (TypeError, ValueError):
+            continue
+    # Swap soc_min/soc_max if user inverted them
+    for b_key, limits in out.items():
+        if "soc_min" in limits and "soc_max" in limits and limits["soc_min"] > limits["soc_max"]:
+            limits["soc_min"], limits["soc_max"] = limits["soc_max"], limits["soc_min"]
+    return out
+
+
+def _finalize_slot(step_a: dict, step_b: dict | None) -> dict:
+    """Merge step A and optional step B into the persisted slot shape."""
+    soc_on = bool(step_a.get("soc_override_enabled", False))
+    power_on = bool(step_a.get("power_override_enabled", False))
+    parsed = _parse_step_b_battery_limits(step_b) if (soc_on or power_on) else {}
+    # Strip fields that don't correspond to an enabled tick (defensive)
+    battery_limits: dict[str, dict] = {}
+    for b_key, limits in parsed.items():
+        entry: dict = {}
+        if soc_on:
+            if "soc_min" in limits:
+                entry["soc_min"] = limits["soc_min"]
+            if "soc_max" in limits:
+                entry["soc_max"] = limits["soc_max"]
+        if power_on:
+            if "max_charge_power_w" in limits:
+                entry["max_charge_power_w"] = limits["max_charge_power_w"]
+            if "max_discharge_power_w" in limits:
+                entry["max_discharge_power_w"] = limits["max_discharge_power_w"]
+        if entry:
+            battery_limits[b_key] = entry
+    return {
+        "start_time": step_a["start_time"],
+        "end_time": step_a["end_time"],
+        "days": step_a["days"],
+        "enabled": True,
+        "battery_scope": step_a.get("battery_scope", SLOT_BATTERY_SCOPE_ALL),
+        "allow_charge": bool(step_a.get("allow_charge", False)),
+        "allow_discharge": bool(step_a.get("allow_discharge", True)),
+        "soc_override_enabled": soc_on,
+        "power_override_enabled": power_on,
+        "battery_limits": battery_limits,
+        "mode": step_a.get("mode", DEFAULT_SLOT_MODE),
+    }
+
+
 class MarstekVenusConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Marstek Venus Energy Manager."""
 
-    VERSION = 2
+    VERSION = 3
 
     def __init__(self):
         """Initialize the config flow."""
@@ -141,6 +421,7 @@ class MarstekVenusConfigFlow(ConfigFlow, domain=DOMAIN):
         self.time_slots = []
         self.excluded_devices = []
         self._current_battery_data = {}  # Stores connection data between battery steps
+        self._pending_slot_step_a: dict | None = None  # Buffer between slot step A and step B
 
     async def _test_connection(self, host: str, port: int, version: str = "v2") -> bool:
         """Test connection to a Marstek Venus battery using version-specific register."""
@@ -206,10 +487,22 @@ class MarstekVenusConfigFlow(ConfigFlow, domain=DOMAIN):
                     if unit not in ["W", "kW"]:
                         errors[CONF_HOUSEHOLD_CONSUMPTION_SENSOR] = "invalid_unit"
 
+            # Validate solar production sensor if provided
+            solar_sensor = user_input.get(CONF_SOLAR_PRODUCTION_SENSOR)
+            if solar_sensor:
+                solar_state = self.hass.states.get(solar_sensor)
+                if solar_state is None:
+                    errors[CONF_SOLAR_PRODUCTION_SENSOR] = "sensor_not_found"
+                else:
+                    unit = solar_state.attributes.get("unit_of_measurement", "")
+                    if unit not in ["W", "kW"]:
+                        errors[CONF_SOLAR_PRODUCTION_SENSOR] = "invalid_unit"
+
             if not errors:
                 self.config_data["consumption_sensor"] = user_input["consumption_sensor"]
                 self.config_data[CONF_SOLAR_FORECAST_SENSOR] = forecast_sensor
                 self.config_data[CONF_HOUSEHOLD_CONSUMPTION_SENSOR] = household_sensor
+                self.config_data[CONF_SOLAR_PRODUCTION_SENSOR] = solar_sensor
                 self.config_data[CONF_METER_INVERTED] = user_input.get(CONF_METER_INVERTED, False)
                 return await self.async_step_batteries()
 
@@ -224,6 +517,8 @@ class MarstekVenusConfigFlow(ConfigFlow, domain=DOMAIN):
                     vol.Optional(CONF_SOLAR_FORECAST_SENSOR):
                         EntitySelector(EntitySelectorConfig(domain="sensor")),
                     vol.Optional(CONF_HOUSEHOLD_CONSUMPTION_SENSOR):
+                        EntitySelector(EntitySelectorConfig(domain="sensor")),
+                    vol.Optional(CONF_SOLAR_PRODUCTION_SENSOR):
                         EntitySelector(EntitySelectorConfig(domain="sensor")),
                 }
             ),
@@ -379,66 +674,84 @@ class MarstekVenusConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_add_time_slot(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Step 5: Add a time slot configuration."""
+        """Step 5A: Configure base attributes of a time slot."""
         slot_num = len(self.time_slots) + 1
-        errors = {}
+        errors: dict = {}
 
         if user_input is not None:
+            errors = _validate_slot_step_a(user_input)
             if not errors:
-                # Save the time slot
-                time_slot = {
-                    "start_time": user_input["start_time"],
-                    "end_time": user_input["end_time"],
-                    "days": user_input["days"],
-                    "apply_to_charge": user_input.get("apply_to_charge", False),
-                }
-
-                if user_input["start_time"] >= user_input["end_time"]:
-                    errors["base"] = "midnight_crossing"
-                elif _slots_overlap(time_slot, self.time_slots):
+                if _slots_overlap(
+                    {
+                        "start_time": user_input["start_time"],
+                        "end_time": user_input["end_time"],
+                        "days": user_input["days"],
+                        "battery_scope": user_input.get("battery_scope", SLOT_BATTERY_SCOPE_ALL),
+                    },
+                    self.time_slots,
+                ):
                     errors["base"] = "overlapping_slots"
-                else:
-                    self.time_slots.append(time_slot)
+            if not errors:
+                self._pending_slot_step_a = dict(user_input)
+                if user_input.get("soc_override_enabled") or user_input.get("power_override_enabled"):
+                    return await self.async_step_add_time_slot_details()
+                return await self._finalize_time_slot(step_b=None)
 
-                    # Check if user wants to add more slots (max 4)
-                    if len(self.time_slots) < 4:
-                        return await self.async_step_add_more_slots()
-                    else:
-                        # Max slots reached, move to excluded devices
-                        self.config_data["no_discharge_time_slots"] = self.time_slots
-                        return await self.async_step_excluded_devices()
-
-        defaults = {
-            "start_time": user_input["start_time"] if user_input else None,
-            "end_time": user_input["end_time"] if user_input else None,
-            "days": user_input["days"] if user_input else ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
-            "apply_to_charge": user_input.get("apply_to_charge", False) if user_input else False,
-        }
-
-        schema_dict = {
-            vol.Required("start_time"): TimeSelector(),
-            vol.Required("end_time"): TimeSelector(),
-            vol.Required("days", default=defaults["days"]):
-                SelectSelector(
-                    SelectSelectorConfig(
-                        options=["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
-                        translation_key="weekday",
-                        multiple=True,
-                        mode=SelectSelectorMode.DROPDOWN,
-                    )
-                ),
-            vol.Required("apply_to_charge", default=defaults["apply_to_charge"]): bool,
-        }
+        defaults = self._slot_defaults_from_existing(len(self.time_slots))
+        if user_input:
+            defaults = {**defaults, **user_input}
 
         return self.async_show_form(
             step_id="add_time_slot",
-            data_schema=vol.Schema(schema_dict),
+            data_schema=_build_slot_step_a_schema(self.battery_configs, defaults),
             errors=errors if errors else None,
+            description_placeholders={"slot_num": str(slot_num)},
+        )
+
+    async def async_step_add_time_slot_details(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Step 5B: Optional SOC / power detail fields for the pending slot."""
+        if self._pending_slot_step_a is None:
+            return await self.async_step_add_time_slot()
+
+        step_a = self._pending_slot_step_a
+        scope = step_a.get("battery_scope", SLOT_BATTERY_SCOPE_ALL)
+        needs_soc = bool(step_a.get("soc_override_enabled"))
+        needs_power = bool(step_a.get("power_override_enabled"))
+        slot_num = len(self.time_slots) + 1
+
+        if user_input is not None:
+            return await self._finalize_time_slot(step_b=user_input)
+
+        defaults = self._slot_defaults_from_existing(len(self.time_slots))
+        return self.async_show_form(
+            step_id="add_time_slot_details",
+            data_schema=_build_slot_step_b_schema(needs_soc, needs_power, scope, self.battery_configs, defaults),
             description_placeholders={
                 "slot_num": str(slot_num),
-                "description": f"Configure time slot {slot_num} (no discharge period)"
+                "battery_map": _battery_scope_name_map(self.battery_configs),
             },
         )
+
+    async def _finalize_time_slot(self, step_b: dict | None) -> FlowResult:
+        """Persist the pending slot and advance the flow."""
+        if self._pending_slot_step_a is None:
+            return await self.async_step_add_time_slot()
+        slot = _finalize_slot(self._pending_slot_step_a, step_b)
+        self.time_slots.append(slot)
+        self._pending_slot_step_a = None
+        if len(self.time_slots) < MAX_TIME_SLOTS:
+            return await self.async_step_add_more_slots()
+        self.config_data["no_discharge_time_slots"] = self.time_slots
+        return await self.async_step_excluded_devices()
+
+    def _slot_defaults_from_existing(self, index: int) -> dict:
+        """Return previously-saved slot at `index`, or empty dict if none."""
+        existing = self.config_data.get("no_discharge_time_slots", []) or []
+        if 0 <= index < len(existing):
+            return dict(existing[index])
+        return {}
 
     async def async_step_add_more_slots(
         self, user_input: dict[str, Any] | None = None
@@ -461,8 +774,7 @@ class MarstekVenusConfigFlow(ConfigFlow, domain=DOMAIN):
             ),
             description_placeholders={
                 "current_slots": str(len(self.time_slots)),
-                "max_slots": "4",
-                "description": f"You have configured {len(self.time_slots)} time slot(s). Add another?"
+                "max_slots": str(MAX_TIME_SLOTS),
             },
         )
 
@@ -1305,6 +1617,140 @@ class MarstekVenusConfigFlow(ConfigFlow, domain=DOMAIN):
             ),
         )
 
+    def _migrate_battery_registry_ids(
+        self,
+        entry: ConfigEntry,
+        old_host: str,
+        old_port: int,
+        new_host: str,
+        new_port: int,
+    ) -> None:
+        """Rename entity unique_ids and device identifiers when a battery's host/port changes.
+
+        Preserves long-term statistics and history by keeping the same entity_id.
+        Battery-level entities use unique_id `{host}_{port}_{key}`; the device identifier
+        is `(DOMAIN, "{host}_{port}")`. Both are rewritten in place.
+        """
+        old_prefix = f"{old_host}_{old_port}_"
+        new_prefix = f"{new_host}_{new_port}_"
+        old_device_id = f"{old_host}_{old_port}"
+        new_device_id = f"{new_host}_{new_port}"
+
+        ent_reg = er.async_get(self.hass)
+        for ent in list(ent_reg.entities.values()):
+            if (
+                ent.config_entry_id == entry.entry_id
+                and ent.unique_id.startswith(old_prefix)
+            ):
+                new_uid = new_prefix + ent.unique_id[len(old_prefix):]
+                ent_reg.async_update_entity(ent.entity_id, new_unique_id=new_uid)
+
+        dev_reg = dr.async_get(self.hass)
+        old_dev = dev_reg.async_get_device(identifiers={(DOMAIN, old_device_id)})
+        if old_dev is not None:
+            new_identifiers = set(old_dev.identifiers)
+            new_identifiers.discard((DOMAIN, old_device_id))
+            new_identifiers.add((DOMAIN, new_device_id))
+            dev_reg.async_update_device(
+                old_dev.id, new_identifiers=new_identifiers
+            )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle reconfiguration — update battery connection settings (IP/port)."""
+        self.battery_index = 0
+        self._reconfigure_batteries: list[dict] = []
+        return await self.async_step_reconfigure_battery()
+
+    async def async_step_reconfigure_battery(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Update connection settings for each battery during reconfiguration."""
+        entry = self._get_reconfigure_entry()
+        current_batteries = entry.data.get("batteries", [])
+        battery_num = self.battery_index + 1
+        errors = {}
+
+        if user_input is not None:
+            battery_version = user_input.get(CONF_BATTERY_VERSION, DEFAULT_VERSION)
+            if not await self._test_connection(
+                user_input[CONF_HOST], user_input[CONF_PORT], battery_version
+            ):
+                errors["base"] = "cannot_connect"
+            else:
+                original = (
+                    current_batteries[self.battery_index]
+                    if self.battery_index < len(current_batteries)
+                    else {}
+                )
+                old_host = original.get(CONF_HOST)
+                old_port = original.get(CONF_PORT)
+                new_host = user_input[CONF_HOST]
+                new_port = user_input[CONF_PORT]
+
+                if (
+                    old_host
+                    and old_port
+                    and (old_host != new_host or old_port != new_port)
+                ):
+                    self._migrate_battery_registry_ids(
+                        entry, old_host, old_port, new_host, new_port
+                    )
+
+                updated = dict(original)
+                updated[CONF_NAME] = user_input[CONF_NAME]
+                updated[CONF_HOST] = new_host
+                updated[CONF_PORT] = new_port
+                updated[CONF_BATTERY_VERSION] = battery_version
+                self._reconfigure_batteries.append(updated)
+                self.battery_index += 1
+
+                if self.battery_index >= len(current_batteries):
+                    return self.async_update_reload_and_abort(
+                        entry,
+                        data_updates={"batteries": self._reconfigure_batteries},
+                    )
+                return await self.async_step_reconfigure_battery()
+
+        current = (
+            current_batteries[self.battery_index]
+            if self.battery_index < len(current_batteries)
+            else {}
+        )
+        defaults = {
+            CONF_NAME: current.get(CONF_NAME, f"Marstek Venus {battery_num}"),
+            CONF_HOST: current.get(CONF_HOST, ""),
+            CONF_PORT: current.get(CONF_PORT, 502),
+            CONF_BATTERY_VERSION: current.get(CONF_BATTERY_VERSION, DEFAULT_VERSION),
+        }
+
+        return self.async_show_form(
+            step_id="reconfigure_battery",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_NAME, default=defaults[CONF_NAME]): str,
+                    vol.Required(CONF_HOST, default=defaults[CONF_HOST]): str,
+                    vol.Required(CONF_PORT, default=defaults[CONF_PORT]): int,
+                    vol.Required(
+                        CONF_BATTERY_VERSION, default=defaults[CONF_BATTERY_VERSION]
+                    ): SelectSelector(
+                        SelectSelectorConfig(
+                            options=[
+                                {"value": "v2", "label": "Ev2"},
+                                {"value": "v3", "label": "Ev3"},
+                                {"value": "vA", "label": "A"},
+                                {"value": "vD", "label": "D"},
+                            ],
+                            mode=SelectSelectorMode.DROPDOWN,
+                        )
+                    ),
+                }
+            ),
+            errors=errors,
+            description_placeholders={"battery_num": str(battery_num)},
+        )
+
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
@@ -1322,6 +1768,7 @@ class OptionsFlowHandler(OptionsFlow):
         self.time_slots = []
         self.excluded_devices = []
         self._current_battery_data = {}  # Stores connection data between battery steps
+        self._pending_slot_step_a: dict | None = None  # Buffer between slot step A and step B
         _LOGGER.info("OptionsFlowHandler initialized successfully for entry: %s", config_entry.entry_id)
 
     async def _test_connection(self, host: str, port: int, version: str = "v2") -> bool:
@@ -1461,10 +1908,22 @@ class OptionsFlowHandler(OptionsFlow):
                         if unit not in ["W", "kW"]:
                             errors[CONF_HOUSEHOLD_CONSUMPTION_SENSOR] = "invalid_unit"
 
+                # Validate solar production sensor if provided
+                solar_sensor = user_input.get(CONF_SOLAR_PRODUCTION_SENSOR)
+                if solar_sensor:
+                    solar_state = self.hass.states.get(solar_sensor)
+                    if solar_state is None:
+                        errors[CONF_SOLAR_PRODUCTION_SENSOR] = "sensor_not_found"
+                    else:
+                        unit = solar_state.attributes.get("unit_of_measurement", "")
+                        if unit not in ["W", "kW"]:
+                            errors[CONF_SOLAR_PRODUCTION_SENSOR] = "invalid_unit"
+
                 if not errors:
                     self.config_data["consumption_sensor"] = user_input["consumption_sensor"]
                     self.config_data[CONF_SOLAR_FORECAST_SENSOR] = forecast_sensor
                     self.config_data[CONF_HOUSEHOLD_CONSUMPTION_SENSOR] = household_sensor
+                    self.config_data[CONF_SOLAR_PRODUCTION_SENSOR] = solar_sensor
                     self.config_data[CONF_METER_INVERTED] = user_input.get(CONF_METER_INVERTED, False)
                     return await self._save_and_finish()
 
@@ -1472,6 +1931,7 @@ class OptionsFlowHandler(OptionsFlow):
             current_sensor = self.config_entry.data.get("consumption_sensor", "")
             current_forecast = self.config_entry.data.get(CONF_SOLAR_FORECAST_SENSOR, "")
             current_household = self.config_entry.data.get(CONF_HOUSEHOLD_CONSUMPTION_SENSOR, "")
+            current_solar = self.config_entry.data.get(CONF_SOLAR_PRODUCTION_SENSOR, "")
             current_inverted = self.config_entry.data.get(CONF_METER_INVERTED, False)
         except Exception as e:
             _LOGGER.error("Error in options flow sensors: %s", e, exc_info=True)
@@ -1488,6 +1948,8 @@ class OptionsFlowHandler(OptionsFlow):
                     vol.Optional(CONF_SOLAR_FORECAST_SENSOR, description={"suggested_value": current_forecast} if current_forecast else {}):
                         EntitySelector(EntitySelectorConfig(domain="sensor")),
                     vol.Optional(CONF_HOUSEHOLD_CONSUMPTION_SENSOR, description={"suggested_value": current_household} if current_household else {}):
+                        EntitySelector(EntitySelectorConfig(domain="sensor")),
+                    vol.Optional(CONF_SOLAR_PRODUCTION_SENSOR, description={"suggested_value": current_solar} if current_solar else {}):
                         EntitySelector(EntitySelectorConfig(domain="sensor")),
                 }
             ),
@@ -1698,81 +2160,86 @@ class OptionsFlowHandler(OptionsFlow):
         )
 
     async def async_step_add_time_slot(self, user_input: dict[str, Any] | None = None) -> FlowResult:
-        """Add a time slot."""
-        errors = {}
+        """Step A: configure base attributes of a time slot."""
+        errors: dict = {}
+        batteries = self.config_entry.data.get("batteries", [])
 
         if user_input is not None:
+            errors = _validate_slot_step_a(user_input)
             if not errors:
-                time_slot = {
-                    "start_time": user_input["start_time"],
-                    "end_time": user_input["end_time"],
-                    "days": user_input["days"],
-                    "apply_to_charge": user_input.get("apply_to_charge", False),
-                }
-
-                if user_input["start_time"] >= user_input["end_time"]:
-                    errors["base"] = "midnight_crossing"
-                elif _slots_overlap(time_slot, self.time_slots):
+                if _slots_overlap(
+                    {
+                        "start_time": user_input["start_time"],
+                        "end_time": user_input["end_time"],
+                        "days": user_input["days"],
+                        "battery_scope": user_input.get("battery_scope", SLOT_BATTERY_SCOPE_ALL),
+                    },
+                    self.time_slots,
+                ):
                     errors["base"] = "overlapping_slots"
-                else:
-                    self.time_slots.append(time_slot)
+            if not errors:
+                self._pending_slot_step_a = dict(user_input)
+                if user_input.get("soc_override_enabled") or user_input.get("power_override_enabled"):
+                    return await self.async_step_add_time_slot_details()
+                return await self._finalize_time_slot(step_b=None)
 
-                    if len(self.time_slots) < 4:
-                        return await self.async_step_add_more_slots()
-                    else:
-                        self.config_data["no_discharge_time_slots"] = self.time_slots
-                        return await self._save_and_finish()
-
-        # Load defaults from existing slots or user_input (on error re-show)
+        defaults = self._options_slot_defaults(len(self.time_slots))
         if user_input:
-            defaults = {
-                "start_time": user_input["start_time"],
-                "end_time": user_input["end_time"],
-                "days": user_input["days"],
-                "apply_to_charge": user_input.get("apply_to_charge", False),
-            }
-        else:
-            current_slots = self.config_entry.data.get("no_discharge_time_slots", [])
-            slot_num = len(self.time_slots)
-
-            if slot_num < len(current_slots):
-                current_slot = current_slots[slot_num]
-                defaults = {
-                    "start_time": current_slot.get("start_time", "00:00:00"),
-                    "end_time": current_slot.get("end_time", "00:00:00"),
-                    "days": current_slot.get("days", ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]),
-                    "apply_to_charge": current_slot.get("apply_to_charge", False),
-                }
-            else:
-                defaults = {
-                    "start_time": "00:00:00",
-                    "end_time": "00:00:00",
-                    "days": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
-                    "apply_to_charge": False,
-                }
+            defaults = {**defaults, **user_input}
 
         slot_num = len(self.time_slots) + 1
         return self.async_show_form(
             step_id="add_time_slot",
-            data_schema=vol.Schema(
-                {
-                    vol.Required("start_time", default=defaults["start_time"]): TimeSelector(),
-                    vol.Required("end_time", default=defaults["end_time"]): TimeSelector(),
-                    vol.Required("days", default=defaults["days"]):
-                        SelectSelector(
-                            SelectSelectorConfig(
-                                options=["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
-                                translation_key="weekday",
-                                multiple=True,
-                                mode=SelectSelectorMode.DROPDOWN,
-                            )
-                        ),
-                    vol.Required("apply_to_charge", default=defaults["apply_to_charge"]): bool,
-                }
-            ),
+            data_schema=_build_slot_step_a_schema(batteries, defaults),
             errors=errors if errors else None,
             description_placeholders={"slot_num": str(slot_num)},
         )
+
+    async def async_step_add_time_slot_details(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Step B: optional SOC / power detail fields for the pending slot."""
+        if self._pending_slot_step_a is None:
+            return await self.async_step_add_time_slot()
+
+        step_a = self._pending_slot_step_a
+        batteries = self.config_entry.data.get("batteries", [])
+        scope = step_a.get("battery_scope", SLOT_BATTERY_SCOPE_ALL)
+        needs_soc = bool(step_a.get("soc_override_enabled"))
+        needs_power = bool(step_a.get("power_override_enabled"))
+        slot_num = len(self.time_slots) + 1
+
+        if user_input is not None:
+            return await self._finalize_time_slot(step_b=user_input)
+
+        defaults = self._options_slot_defaults(len(self.time_slots))
+        return self.async_show_form(
+            step_id="add_time_slot_details",
+            data_schema=_build_slot_step_b_schema(needs_soc, needs_power, scope, batteries, defaults),
+            description_placeholders={
+                "slot_num": str(slot_num),
+                "battery_map": _battery_scope_name_map(batteries),
+            },
+        )
+
+    async def _finalize_time_slot(self, step_b: dict | None) -> FlowResult:
+        """Persist the pending slot and advance the flow."""
+        if self._pending_slot_step_a is None:
+            return await self.async_step_add_time_slot()
+        slot = _finalize_slot(self._pending_slot_step_a, step_b)
+        self.time_slots.append(slot)
+        self._pending_slot_step_a = None
+        if len(self.time_slots) < MAX_TIME_SLOTS:
+            return await self.async_step_add_more_slots()
+        self.config_data["no_discharge_time_slots"] = self.time_slots
+        return await self._save_and_finish()
+
+    def _options_slot_defaults(self, index: int) -> dict:
+        """Return previously-saved slot at `index`, or empty dict if none."""
+        existing = self.config_entry.data.get("no_discharge_time_slots", []) or []
+        if 0 <= index < len(existing):
+            return dict(existing[index])
+        return {}
 
     async def async_step_add_more_slots(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Ask if user wants to add more time slots."""
@@ -1796,7 +2263,7 @@ class OptionsFlowHandler(OptionsFlow):
             ),
             description_placeholders={
                 "current_slots": str(len(self.time_slots)),
-                "max_slots": "4",
+                "max_slots": str(MAX_TIME_SLOTS),
             },
         )
 

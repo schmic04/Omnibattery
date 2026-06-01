@@ -8,12 +8,14 @@
           "consumption_sensor": "Grid consumption sensor",
           "solar_forecast_sensor": "Solar forecast sensor (optional)",
           "household_consumption_sensor": "Household consumption sensor (optional)",
+          "solar_production_sensor": "Solar production sensor (optional)",
           "meter_inverted": "Inverted meter sign"
         },
         "data_description": {
           "consumption_sensor": "Sensor that indicates imported (+) or exported (-) power to the grid. The controller will adjust batteries to keep this value near 0W.",
           "solar_forecast_sensor": "Sensor providing solar production forecast in kWh (e.g., Solcast). If configured here, it will be used automatically for predictive charging and solar charge delay.",
           "household_consumption_sensor": "Power sensor (W) measuring total household consumption. When configured, predictive charging and charge delay will use real consumption data instead of estimating from battery discharge.",
+          "solar_production_sensor": "Real-time PV production power sensor (W/kW) from an external inverter not wired through the battery MPPT inputs. Used to show the Solar node in the dashboard energy-flow diagram. Leave empty if your panels feed the battery MPPT directly.",
           "meter_inverted": "Enable this option if your meter uses the opposite convention: positive = export, negative = import. The unit (W/kW) is detected automatically."
         }
       },
@@ -73,20 +75,58 @@
       },
       "add_time_slot": {
         "title": "Time slot {slot_num}",
-        "description": "Define a time slot where batteries will be ALLOWED to discharge. Outside this slot, they will not discharge.",
+        "description": "Define when and how the batteries are allowed to operate. The ticks control each direction, SOC and power. Manual mode forces an exact power, bypassing the PD algorithm.",
         "data": {
           "start_time": "Start time",
           "end_time": "End time",
           "days": "Days of the week",
-          "apply_to_charge": "Apply also to charging",
-          "target_grid_power": "Target Grid Power (W)"
+          "battery_scope": "Target battery",
+          "allow_charge": "Allow charge",
+          "allow_discharge": "Allow discharge",
+          "soc_override_enabled": "Override slot SOC max/min",
+          "power_override_enabled": "Override slot max charge/discharge power",
+          "mode": "Operation mode"
         },
         "data_description": {
-          "start_time": "Start time of the slot (24h format)",
-          "end_time": "End time of the slot (24h format)",
-          "days": "Days when this slot applies",
-          "apply_to_charge": "If checked, the slot will also restrict charging (battery will only charge during this slot)",
-          "target_grid_power": "Grid power the controller regulates toward during this slot. 0W = zero grid flow (default). Negative = slight export (e.g. -150W). Positive = allow slight import."
+          "start_time": "Slot start time (24h). Midnight crossing supported.",
+          "end_time": "Slot end time (24h).",
+          "days": "Days when this slot applies.",
+          "battery_scope": "Select 'all' to apply to every battery, or pick a specific one.",
+          "allow_charge": "If checked, charge is allowed during the slot. If NO slot allows charge, charge is unrestricted by default.",
+          "allow_discharge": "If checked, discharge is allowed during the slot. If NO slot allows discharge, discharge is unrestricted by default.",
+          "soc_override_enabled": "If checked, the slot overrides the battery's max/min SOC inside the window.",
+          "power_override_enabled": "If checked, the slot limits or forces the max power.",
+          "mode": "PD: the predictive algorithm caps power using the slot value. Manual: forced discharge or charge at the configured power."
+        }
+      },
+      "add_time_slot_details": {
+        "title": "Slot {slot_num} details",
+        "description": "Configure SOC and/or power limits per battery. Every battery has its own sliders. Mapping: {battery_map}. SOC min range: 12–30%. SOC max range: 80–100%. Power range: 100 W up to each battery’s hardware max.",
+        "data": {
+          "battery_1__soc_min": "Battery 1 — Min SOC (%)",
+          "battery_1__soc_max": "Battery 1 — Max SOC (%)",
+          "battery_1__max_charge_power_w": "Battery 1 — Max charge power",
+          "battery_1__max_discharge_power_w": "Battery 1 — Max discharge power",
+          "battery_2__soc_min": "Battery 2 — Min SOC (%)",
+          "battery_2__soc_max": "Battery 2 — Max SOC (%)",
+          "battery_2__max_charge_power_w": "Battery 2 — Max charge power",
+          "battery_2__max_discharge_power_w": "Battery 2 — Max discharge power",
+          "battery_3__soc_min": "Battery 3 — Min SOC (%)",
+          "battery_3__soc_max": "Battery 3 — Max SOC (%)",
+          "battery_3__max_charge_power_w": "Battery 3 — Max charge power",
+          "battery_3__max_discharge_power_w": "Battery 3 — Max discharge power",
+          "battery_4__soc_min": "Battery 4 — Min SOC (%)",
+          "battery_4__soc_max": "Battery 4 — Max SOC (%)",
+          "battery_4__max_charge_power_w": "Battery 4 — Max charge power",
+          "battery_4__max_discharge_power_w": "Battery 4 — Max discharge power",
+          "battery_5__soc_min": "Battery 5 — Min SOC (%)",
+          "battery_5__soc_max": "Battery 5 — Max SOC (%)",
+          "battery_5__max_charge_power_w": "Battery 5 — Max charge power",
+          "battery_5__max_discharge_power_w": "Battery 5 — Max discharge power",
+          "battery_6__soc_min": "Battery 6 — Min SOC (%)",
+          "battery_6__soc_max": "Battery 6 — Max SOC (%)",
+          "battery_6__max_charge_power_w": "Battery 6 — Max charge power",
+          "battery_6__max_discharge_power_w": "Battery 6 — Max discharge power"
         }
       },
       "add_more_slots": {
@@ -325,18 +365,37 @@
           "hourly_balance_deadband_wh": "Tolerance band around the target. No correction is applied when the net balance is within ±N kWh of the target. 0 = exact correction.",
           "hourly_balance_hysteresis_w": "Minimum change in offset required before a new correction is applied. Prevents micro-adjustments every cycle. 0 = apply every cycle. Default: 15 W."
         }
+      },
+      "reconfigure_battery": {
+        "title": "Reconfigure battery {battery_num} — Connection",
+        "description": "Update connection details for battery {battery_num}. Power limits, SOC limits and all other settings are preserved.",
+        "data": {
+          "name": "Name",
+          "host": "IP Address",
+          "port": "Modbus Port",
+          "battery_version": "Battery Model"
+        },
+        "data_description": {
+          "name": "Descriptive name to identify this battery",
+          "host": "New IP address of the battery on your local network",
+          "port": "Modbus port (usually 502)",
+          "battery_version": "Select your battery model version"
+        }
       }
     },
     "error": {
       "cannot_connect": "Cannot connect to the battery. Check the IP address and that the battery is accessible on the network.",
       "sensor_not_found": "Solar forecast sensor does not exist. Verify the sensor is available.",
       "invalid_unit": "Solar forecast sensor must have 'kWh' or 'Wh' as unit.",
-      "overlapping_slots": "This time slot overlaps with an existing one. Adjust the times or days.",
+      "overlapping_slots": "This time slot overlaps with an existing one for the same battery. Adjust the times, days, or battery scope.",
       "midnight_crossing": "Start time must be before end time. For overnight periods, create two separate slots (e.g., 22:00-23:59 and 00:00-06:00).",
+      "slot_does_nothing": "The slot must allow at least one direction (charge or discharge).",
+      "manual_requires_power": "Manual mode requires the power override tick to be enabled.",
       "no_price_data": "Selected sensor does not have the expected price attributes. Nordpool: needs `raw_today` attribute. PVPC: needs `price_00h` … `price_23h` attributes. CKW: needs `prices` attribute with a list of slots. EPEX: needs `data` attribute with a list of slots. ENTSO-e: needs `prices_today` attribute with a list of slots."
     },
     "abort": {
-      "already_configured": "This integration is already configured."
+      "already_configured": "This integration is already configured.",
+      "reconfigure_successful": "Battery connection settings updated successfully."
     }
   },
   "options": {
@@ -364,12 +423,14 @@
           "consumption_sensor": "Grid consumption sensor",
           "solar_forecast_sensor": "Solar forecast sensor (optional)",
           "household_consumption_sensor": "Household consumption sensor (optional)",
+          "solar_production_sensor": "Solar production sensor (optional)",
           "meter_inverted": "Inverted meter sign"
         },
         "data_description": {
           "consumption_sensor": "Sensor that indicates imported (+) or exported (-) power to the grid.",
           "solar_forecast_sensor": "Sensor providing solar production forecast in kWh (e.g., Solcast). If configured here, it will be used automatically for predictive charging and solar charge delay.",
           "household_consumption_sensor": "Power sensor (W) measuring total household consumption. When configured, predictive charging and charge delay will use real consumption data instead of estimating from battery discharge.",
+          "solar_production_sensor": "Real-time PV production power sensor (W/kW) from an external inverter not wired through the battery MPPT inputs. Used to show the Solar node in the dashboard energy-flow diagram. Leave empty if your panels feed the battery MPPT directly.",
           "meter_inverted": "Enable this option if your meter uses the opposite convention: positive = export, negative = import. The unit (W/kW) is detected automatically."
         }
       },
@@ -429,20 +490,58 @@
       },
       "add_time_slot": {
         "title": "Time slot {slot_num}",
-        "description": "Define or modify a time slot where batteries will be ALLOWED to discharge.",
+        "description": "Define when and how the batteries are allowed to operate. The ticks control each direction, SOC and power. Manual mode forces an exact power, bypassing the PD algorithm.",
         "data": {
           "start_time": "Start time",
           "end_time": "End time",
           "days": "Days of the week",
-          "apply_to_charge": "Apply also to charging",
-          "target_grid_power": "Target Grid Power (W)"
+          "battery_scope": "Target battery",
+          "allow_charge": "Allow charge",
+          "allow_discharge": "Allow discharge",
+          "soc_override_enabled": "Override slot SOC max/min",
+          "power_override_enabled": "Override slot max charge/discharge power",
+          "mode": "Operation mode"
         },
         "data_description": {
-          "start_time": "Start time of the slot (24h format)",
-          "end_time": "End time of the slot (24h format)",
-          "days": "Days when this slot applies",
-          "apply_to_charge": "If checked, the slot will also restrict charging (battery will only charge during this slot)",
-          "target_grid_power": "Grid power the controller regulates toward during this slot. 0W = zero grid flow (default). Negative = slight export (e.g. -150W). Positive = allow slight import."
+          "start_time": "Slot start time (24h). Midnight crossing supported.",
+          "end_time": "Slot end time (24h).",
+          "days": "Days when this slot applies.",
+          "battery_scope": "Select 'all' to apply to every battery, or pick a specific one.",
+          "allow_charge": "If checked, charge is allowed during the slot. If NO slot allows charge, charge is unrestricted by default.",
+          "allow_discharge": "If checked, discharge is allowed during the slot. If NO slot allows discharge, discharge is unrestricted by default.",
+          "soc_override_enabled": "If checked, the slot overrides the battery's max/min SOC inside the window.",
+          "power_override_enabled": "If checked, the slot limits or forces the max power.",
+          "mode": "PD: the predictive algorithm caps power using the slot value. Manual: forced discharge or charge at the configured power."
+        }
+      },
+      "add_time_slot_details": {
+        "title": "Slot {slot_num} details",
+        "description": "Configure SOC and/or power limits per battery. Every battery has its own sliders. Mapping: {battery_map}. SOC min range: 12–30%. SOC max range: 80–100%. Power range: 100 W up to each battery’s hardware max.",
+        "data": {
+          "battery_1__soc_min": "Battery 1 — Min SOC (%)",
+          "battery_1__soc_max": "Battery 1 — Max SOC (%)",
+          "battery_1__max_charge_power_w": "Battery 1 — Max charge power",
+          "battery_1__max_discharge_power_w": "Battery 1 — Max discharge power",
+          "battery_2__soc_min": "Battery 2 — Min SOC (%)",
+          "battery_2__soc_max": "Battery 2 — Max SOC (%)",
+          "battery_2__max_charge_power_w": "Battery 2 — Max charge power",
+          "battery_2__max_discharge_power_w": "Battery 2 — Max discharge power",
+          "battery_3__soc_min": "Battery 3 — Min SOC (%)",
+          "battery_3__soc_max": "Battery 3 — Max SOC (%)",
+          "battery_3__max_charge_power_w": "Battery 3 — Max charge power",
+          "battery_3__max_discharge_power_w": "Battery 3 — Max discharge power",
+          "battery_4__soc_min": "Battery 4 — Min SOC (%)",
+          "battery_4__soc_max": "Battery 4 — Max SOC (%)",
+          "battery_4__max_charge_power_w": "Battery 4 — Max charge power",
+          "battery_4__max_discharge_power_w": "Battery 4 — Max discharge power",
+          "battery_5__soc_min": "Battery 5 — Min SOC (%)",
+          "battery_5__soc_max": "Battery 5 — Max SOC (%)",
+          "battery_5__max_charge_power_w": "Battery 5 — Max charge power",
+          "battery_5__max_discharge_power_w": "Battery 5 — Max discharge power",
+          "battery_6__soc_min": "Battery 6 — Min SOC (%)",
+          "battery_6__soc_max": "Battery 6 — Max SOC (%)",
+          "battery_6__max_charge_power_w": "Battery 6 — Max charge power",
+          "battery_6__max_discharge_power_w": "Battery 6 — Max discharge power"
         }
       },
       "add_more_slots": {
@@ -687,8 +786,10 @@
       "cannot_connect": "Cannot connect to the battery. Check the IP address and that the battery is accessible on the network.",
       "sensor_not_found": "Solar forecast sensor does not exist. Verify the sensor is available.",
       "invalid_unit": "Solar forecast sensor must have 'kWh' or 'Wh' as unit.",
-      "overlapping_slots": "This time slot overlaps with an existing one. Adjust the times or days.",
-      "midnight_crossing": "Start time must be before end time. For overnight periods, create two separate slots (e.g., 22:00-23:59 and 00:00-06:00)."
+      "overlapping_slots": "This time slot overlaps with an existing one for the same battery. Adjust the times, days, or battery scope.",
+      "midnight_crossing": "Start time must be before end time. For overnight periods, create two separate slots (e.g., 22:00-23:59 and 00:00-06:00).",
+      "slot_does_nothing": "The slot must allow at least one direction (charge or discharge).",
+      "manual_requires_power": "Manual mode requires the power override tick to be enabled."
     }
   },
   "selector": {
@@ -701,6 +802,17 @@
         "fri": "Friday",
         "sat": "Saturday",
         "sun": "Sunday"
+      }
+    },
+    "slot_mode": {
+      "options": {
+        "pd": "PD (predictive algorithm)",
+        "manual": "Manual (forced power)"
+      }
+    },
+    "slot_battery_scope": {
+      "options": {
+        "all": "All batteries"
       }
     },
     "predictive_charging_mode": {
@@ -785,6 +897,18 @@
       "active_batteries": {
         "name": "Active Batteries"
       },
+      "system_daily_solar_energy": {
+        "name": "Daily Solar Production"
+      },
+      "system_daily_home_energy": {
+        "name": "Daily Home Consumption"
+      },
+      "system_daily_grid_import_energy": {
+        "name": "Daily Grid Import"
+      },
+      "system_daily_grid_export_energy": {
+        "name": "Daily Grid Export"
+      },
       "non_responsive_batteries": {
         "name": "Non-Responsive Batteries"
       },
@@ -815,7 +939,9 @@
           "ev_charger_pause": "EV Charger Pause",
           "ev_discharge_blocked": "EV Discharge Blocked",
           "backup_mode": "Backup Mode",
+          "time_slot_manual": "Manual Time Slot",
           "no_discharge_slot": "No-Discharge Window",
+          "no_charge_slot": "No-Charge Window",
           "charging": "Charging",
           "discharging": "Discharging",
           "balanced": "Standby"
@@ -964,6 +1090,9 @@
       },
       "battery_cycle_count": {
         "name": "Battery Cycle Count"
+      },
+      "balancing_mode": {
+        "name": "Balancing Mode"
       },
       "battery_cycle_count_calc": {
         "name": "Battery Cycle Count (Calc)"

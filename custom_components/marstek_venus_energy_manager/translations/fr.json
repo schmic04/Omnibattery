@@ -8,12 +8,14 @@
           "consumption_sensor": "Capteur de consommation réseau",
           "solar_forecast_sensor": "Capteur de prévision solaire (optionnel)",
           "household_consumption_sensor": "Capteur de consommation domestique (optionnel)",
+          "solar_production_sensor": "Capteur de production solaire (optionnel)",
           "meter_inverted": "Signe du compteur inversé"
         },
         "data_description": {
           "consumption_sensor": "Capteur qui indique la puissance importée (+) ou exportée (-) vers le réseau. Le contrôleur ajustera les batteries pour maintenir cette valeur proche de 0W.",
           "solar_forecast_sensor": "Capteur fournissant la prévision de production solaire en kWh (ex : Solcast). S'il est configuré ici, il sera utilisé automatiquement pour la charge prédictive et le retard de charge solaire.",
           "household_consumption_sensor": "Capteur de puissance (W) mesurant la consommation totale du foyer. Lorsqu'il est configuré, la charge prédictive et le retard de charge utiliseront des données de consommation réelles au lieu d'estimer à partir de la décharge de la batterie.",
+          "solar_production_sensor": "Capteur de puissance de production photovoltaïque en temps réel (W/kW) d'un onduleur externe non raccordé aux entrées MPPT de la batterie. Utilisé pour afficher le nœud Solaire dans le diagramme de flux d'énergie du tableau de bord. Laissez vide si vos panneaux alimentent directement le MPPT de la batterie.",
           "meter_inverted": "Activez cette option si votre compteur utilise la convention opposée : positif = exportation, négatif = importation. L'unité (W/kW) est détectée automatiquement."
         }
       },
@@ -73,20 +75,64 @@
       },
       "add_time_slot": {
         "title": "Plage horaire {slot_num}",
-        "description": "Définissez une plage horaire pendant laquelle les batteries POURRONT se décharger. En dehors de cette plage, elles ne se déchargeront pas.",
+        "description": "Définissez quand et comment les batteries peuvent fonctionner. Les cases contrôlent chaque direction, le SOC et la puissance. Le mode manuel force une puissance exacte en ignorant l'algorithme PD.",
         "data": {
           "start_time": "Heure de début",
           "end_time": "Heure de fin",
           "days": "Jours de la semaine",
-          "apply_to_charge": "Appliquer aussi à la charge",
-          "target_grid_power": "Puissance réseau cible (W)"
+          "battery_scope": "Batterie concernée",
+          "allow_charge": "Autoriser la charge",
+          "allow_discharge": "Autoriser la décharge",
+          "soc_override_enabled": "Contrôler le SOC max/min de la plage",
+          "power_override_enabled": "Contrôler la puissance max de charge/décharge",
+          "mode": "Mode de fonctionnement"
         },
         "data_description": {
-          "start_time": "Heure de début de la plage (format 24h)",
-          "end_time": "Heure de fin de la plage (format 24h)",
-          "days": "Jours où cette plage s'applique",
-          "apply_to_charge": "Si coché, la plage limitera également la charge (la batterie ne se chargera que pendant cette plage)",
-          "target_grid_power": "Puissance réseau vers laquelle le contrôleur régule pendant cette plage. 0W = flux réseau nul (par défaut). Négatif = légère exportation (ex : -150W). Positif = légère importation autorisée."
+          "start_time": "Heure de début (24h). Le passage à minuit est pris en charge.",
+          "end_time": "Heure de fin (24h).",
+          "days": "Jours où cette plage s'applique.",
+          "battery_scope": "Sélectionnez 'all' pour toutes les batteries ou une batterie spécifique.",
+          "allow_charge": "Si coché, la charge est autorisée pendant la plage. Si AUCUNE plage n'autorise la charge, elle est libre par défaut.",
+          "allow_discharge": "Si coché, la décharge est autorisée pendant la plage. Si AUCUNE plage n'autorise la décharge, elle est libre par défaut.",
+          "soc_override_enabled": "Si coché, la plage remplace le SOC max/min de la batterie dans la fenêtre.",
+          "power_override_enabled": "Si coché, la plage limite ou force la puissance maximale.",
+          "mode": "PD : l'algorithme prédictif ajuste la puissance avec le plafond de la plage. Manuel : décharge ou charge forcée à la puissance indiquée."
+        }
+      },
+      "add_time_slot_details": {
+        "title": "Détails de la plage {slot_num}",
+        "description": "Configurez les limites de SOC et/ou de puissance par batterie. Chaque batterie a ses propres curseurs. Correspondance: {battery_map}. SOC min: 12–30%. SOC max: 80–100%. Puissance: 100 W jusqu’au max matériel.",
+        "data": {
+          "battery_1__soc_min": "Batterie 1 — SOC min. (%)",
+          "battery_1__soc_max": "Batterie 1 — SOC max. (%)",
+          "battery_1__max_charge_power_w": "Batterie 1 — Puissance max. charge (W)",
+          "battery_1__max_discharge_power_w": "Batterie 1 — Puissance max. décharge (W)",
+          "battery_2__soc_min": "Batterie 2 — SOC min. (%)",
+          "battery_2__soc_max": "Batterie 2 — SOC max. (%)",
+          "battery_2__max_charge_power_w": "Batterie 2 — Puissance max. charge (W)",
+          "battery_2__max_discharge_power_w": "Batterie 2 — Puissance max. décharge (W)",
+          "battery_3__soc_min": "Batterie 3 — SOC min. (%)",
+          "battery_3__soc_max": "Batterie 3 — SOC max. (%)",
+          "battery_3__max_charge_power_w": "Batterie 3 — Puissance max. charge (W)",
+          "battery_3__max_discharge_power_w": "Batterie 3 — Puissance max. décharge (W)",
+          "battery_4__soc_min": "Batterie 4 — SOC min. (%)",
+          "battery_4__soc_max": "Batterie 4 — SOC max. (%)",
+          "battery_4__max_charge_power_w": "Batterie 4 — Puissance max. charge (W)",
+          "battery_4__max_discharge_power_w": "Batterie 4 — Puissance max. décharge (W)",
+          "battery_5__soc_min": "Batterie 5 — SOC min. (%)",
+          "battery_5__soc_max": "Batterie 5 — SOC max. (%)",
+          "battery_5__max_charge_power_w": "Batterie 5 — Puissance max. charge (W)",
+          "battery_5__max_discharge_power_w": "Batterie 5 — Puissance max. décharge (W)",
+          "battery_6__soc_min": "Batterie 6 — SOC min. (%)",
+          "battery_6__soc_max": "Batterie 6 — SOC max. (%)",
+          "battery_6__max_charge_power_w": "Batterie 6 — Puissance max. charge (W)",
+          "battery_6__max_discharge_power_w": "Batterie 6 — Puissance max. décharge (W)"
+        },
+        "data_description": {
+          "soc_min": "La batterie ne se déchargera pas sous ce SOC pendant la plage (plancher 12%).",
+          "soc_max": "La batterie ne se chargera pas au-dessus de ce SOC pendant la plage (plafond 100%).",
+          "max_charge_power_w": "En mode PD c'est le plafond dynamique. En mode manuel c'est la puissance de charge exacte.",
+          "max_discharge_power_w": "En mode PD c'est le plafond dynamique. En mode manuel c'est la puissance de décharge exacte."
         }
       },
       "add_more_slots": {
@@ -325,18 +371,37 @@
           "hourly_balance_deadband_wh": "Bande de tolérance autour de l objectif. Aucune correction si le bilan net est dans ±N kWh de l objectif. 0 = correction exacte.",
           "hourly_balance_hysteresis_w": "Variation minimale du décalage nécessaire pour appliquer une nouvelle correction. Évite les micro-ajustements à chaque cycle. 0 = appliquer toujours. Par défaut : 15 W."
         }
+      },
+      "reconfigure_battery": {
+        "title": "Reconfigurer la batterie {battery_num} — Connexion",
+        "description": "Mettre à jour les paramètres de connexion de la batterie {battery_num}. Les limites de puissance, de SOC et tous les autres réglages sont conservés.",
+        "data": {
+          "name": "Nom",
+          "host": "Adresse IP",
+          "port": "Port Modbus",
+          "battery_version": "Modèle de batterie"
+        },
+        "data_description": {
+          "name": "Nom descriptif pour identifier cette batterie",
+          "host": "Nouvelle adresse IP de la batterie sur le réseau local",
+          "port": "Port Modbus (généralement 502)",
+          "battery_version": "Sélectionnez la version de votre modèle de batterie"
+        }
       }
     },
     "error": {
       "cannot_connect": "Impossible de se connecter à la batterie. Vérifiez l'adresse IP et que la batterie est accessible sur le réseau.",
       "sensor_not_found": "Le capteur de prévision solaire n'existe pas. Vérifiez que le capteur est disponible.",
       "invalid_unit": "Le capteur de prévision solaire doit avoir 'kWh' ou 'Wh' comme unité.",
-      "overlapping_slots": "Ce créneau horaire chevauche un créneau existant. Ajustez les horaires ou les jours.",
+      "overlapping_slots": "Ce créneau chevauche un autre créneau pour la même batterie. Ajustez les horaires, jours ou batterie cible.",
       "midnight_crossing": "L'heure de début doit être antérieure à l'heure de fin. Pour les périodes nocturnes, créez deux créneaux séparés (ex: 22:00-23:59 et 00:00-06:00).",
+      "slot_does_nothing": "Le créneau doit autoriser au moins une direction (charge ou décharge).",
+      "manual_requires_power": "Le mode manuel nécessite l'activation du contrôle de puissance.",
       "no_price_data": "Le capteur sélectionné ne possède pas les attributs de prix attendus. Nordpool : nécessite `raw_today`. PVPC : nécessite `price_00h` … `price_23h`. CKW : nécessite l'attribut `prices` avec une liste de créneaux. EPEX : nécessite l'attribut `data` avec une liste de créneaux. ENTSO-e : nécessite l'attribut `prices_today` avec une liste de créneaux."
     },
     "abort": {
-      "already_configured": "Cette intégration est déjà configurée."
+      "already_configured": "Cette intégration est déjà configurée.",
+      "reconfigure_successful": "Paramètres de connexion de la batterie mis à jour avec succès."
     }
   },
   "options": {
@@ -364,12 +429,14 @@
           "consumption_sensor": "Capteur de consommation réseau",
           "solar_forecast_sensor": "Capteur de prévision solaire (optionnel)",
           "household_consumption_sensor": "Capteur de consommation domestique (optionnel)",
+          "solar_production_sensor": "Capteur de production solaire (optionnel)",
           "meter_inverted": "Signe du compteur inversé"
         },
         "data_description": {
           "consumption_sensor": "Capteur qui indique la puissance importée (+) ou exportée (-) vers le réseau.",
           "solar_forecast_sensor": "Capteur fournissant la prévision de production solaire en kWh (ex : Solcast). S'il est configuré ici, il sera utilisé automatiquement pour la charge prédictive et le retard de charge solaire.",
           "household_consumption_sensor": "Capteur de puissance (W) mesurant la consommation totale du foyer. Lorsqu'il est configuré, la charge prédictive et le retard de charge utiliseront des données de consommation réelles au lieu d'estimer à partir de la décharge de la batterie.",
+          "solar_production_sensor": "Capteur de puissance de production photovoltaïque en temps réel (W/kW) d'un onduleur externe non raccordé aux entrées MPPT de la batterie. Utilisé pour afficher le nœud Solaire dans le diagramme de flux d'énergie du tableau de bord. Laissez vide si vos panneaux alimentent directement le MPPT de la batterie.",
           "meter_inverted": "Activez cette option si votre compteur utilise la convention opposée : positif = exportation, négatif = importation. L'unité (W/kW) est détectée automatiquement."
         }
       },
@@ -429,20 +496,64 @@
       },
       "add_time_slot": {
         "title": "Plage horaire {slot_num}",
-        "description": "Définissez ou modifiez une plage horaire pendant laquelle les batteries POURRONT se décharger.",
+        "description": "Définissez quand et comment les batteries peuvent fonctionner. Les cases contrôlent chaque direction, le SOC et la puissance. Le mode manuel force une puissance exacte en ignorant l'algorithme PD.",
         "data": {
           "start_time": "Heure de début",
           "end_time": "Heure de fin",
           "days": "Jours de la semaine",
-          "apply_to_charge": "Appliquer aussi à la charge",
-          "target_grid_power": "Puissance réseau cible (W)"
+          "battery_scope": "Batterie concernée",
+          "allow_charge": "Autoriser la charge",
+          "allow_discharge": "Autoriser la décharge",
+          "soc_override_enabled": "Contrôler le SOC max/min de la plage",
+          "power_override_enabled": "Contrôler la puissance max de charge/décharge",
+          "mode": "Mode de fonctionnement"
         },
         "data_description": {
-          "start_time": "Heure de début de la plage (format 24h)",
-          "end_time": "Heure de fin de la plage (format 24h)",
-          "days": "Jours où cette plage s'applique",
-          "apply_to_charge": "Si coché, la plage limitera également la charge (la batterie ne se chargera que pendant cette plage)",
-          "target_grid_power": "Puissance réseau vers laquelle le contrôleur régule pendant cette plage. 0W = flux réseau nul (par défaut). Négatif = légère exportation (ex : -150W). Positif = légère importation autorisée."
+          "start_time": "Heure de début (24h). Le passage à minuit est pris en charge.",
+          "end_time": "Heure de fin (24h).",
+          "days": "Jours où cette plage s'applique.",
+          "battery_scope": "Sélectionnez 'all' pour toutes les batteries ou une batterie spécifique.",
+          "allow_charge": "Si coché, la charge est autorisée pendant la plage. Si AUCUNE plage n'autorise la charge, elle est libre par défaut.",
+          "allow_discharge": "Si coché, la décharge est autorisée pendant la plage. Si AUCUNE plage n'autorise la décharge, elle est libre par défaut.",
+          "soc_override_enabled": "Si coché, la plage remplace le SOC max/min de la batterie dans la fenêtre.",
+          "power_override_enabled": "Si coché, la plage limite ou force la puissance maximale.",
+          "mode": "PD : l'algorithme prédictif ajuste la puissance avec le plafond de la plage. Manuel : décharge ou charge forcée à la puissance indiquée."
+        }
+      },
+      "add_time_slot_details": {
+        "title": "Détails de la plage {slot_num}",
+        "description": "Configurez les limites de SOC et/ou de puissance par batterie. Chaque batterie a ses propres curseurs. Correspondance: {battery_map}. SOC min: 12–30%. SOC max: 80–100%. Puissance: 100 W jusqu’au max matériel.",
+        "data": {
+          "battery_1__soc_min": "Batterie 1 — SOC min. (%)",
+          "battery_1__soc_max": "Batterie 1 — SOC max. (%)",
+          "battery_1__max_charge_power_w": "Batterie 1 — Puissance max. charge (W)",
+          "battery_1__max_discharge_power_w": "Batterie 1 — Puissance max. décharge (W)",
+          "battery_2__soc_min": "Batterie 2 — SOC min. (%)",
+          "battery_2__soc_max": "Batterie 2 — SOC max. (%)",
+          "battery_2__max_charge_power_w": "Batterie 2 — Puissance max. charge (W)",
+          "battery_2__max_discharge_power_w": "Batterie 2 — Puissance max. décharge (W)",
+          "battery_3__soc_min": "Batterie 3 — SOC min. (%)",
+          "battery_3__soc_max": "Batterie 3 — SOC max. (%)",
+          "battery_3__max_charge_power_w": "Batterie 3 — Puissance max. charge (W)",
+          "battery_3__max_discharge_power_w": "Batterie 3 — Puissance max. décharge (W)",
+          "battery_4__soc_min": "Batterie 4 — SOC min. (%)",
+          "battery_4__soc_max": "Batterie 4 — SOC max. (%)",
+          "battery_4__max_charge_power_w": "Batterie 4 — Puissance max. charge (W)",
+          "battery_4__max_discharge_power_w": "Batterie 4 — Puissance max. décharge (W)",
+          "battery_5__soc_min": "Batterie 5 — SOC min. (%)",
+          "battery_5__soc_max": "Batterie 5 — SOC max. (%)",
+          "battery_5__max_charge_power_w": "Batterie 5 — Puissance max. charge (W)",
+          "battery_5__max_discharge_power_w": "Batterie 5 — Puissance max. décharge (W)",
+          "battery_6__soc_min": "Batterie 6 — SOC min. (%)",
+          "battery_6__soc_max": "Batterie 6 — SOC max. (%)",
+          "battery_6__max_charge_power_w": "Batterie 6 — Puissance max. charge (W)",
+          "battery_6__max_discharge_power_w": "Batterie 6 — Puissance max. décharge (W)"
+        },
+        "data_description": {
+          "soc_min": "La batterie ne se déchargera pas sous ce SOC pendant la plage (plancher 12%).",
+          "soc_max": "La batterie ne se chargera pas au-dessus de ce SOC pendant la plage (plafond 100%).",
+          "max_charge_power_w": "En mode PD c'est le plafond dynamique. En mode manuel c'est la puissance de charge exacte.",
+          "max_discharge_power_w": "En mode PD c'est le plafond dynamique. En mode manuel c'est la puissance de décharge exacte."
         }
       },
       "add_more_slots": {
@@ -687,8 +798,10 @@
       "cannot_connect": "Impossible de se connecter à la batterie. Vérifiez l'adresse IP et que la batterie est accessible sur le réseau.",
       "sensor_not_found": "Le capteur de prévision solaire n'existe pas. Vérifiez que le capteur est disponible.",
       "invalid_unit": "Le capteur de prévision solaire doit avoir 'kWh' ou 'Wh' comme unité.",
-      "overlapping_slots": "Ce créneau horaire chevauche un créneau existant. Ajustez les horaires ou les jours.",
+      "overlapping_slots": "Ce créneau chevauche un autre créneau pour la même batterie. Ajustez les horaires, jours ou batterie cible.",
       "midnight_crossing": "L'heure de début doit être antérieure à l'heure de fin. Pour les périodes nocturnes, créez deux créneaux séparés (ex: 22:00-23:59 et 00:00-06:00).",
+      "slot_does_nothing": "Le créneau doit autoriser au moins une direction (charge ou décharge).",
+      "manual_requires_power": "Le mode manuel nécessite l'activation du contrôle de puissance.",
       "no_price_data": "Le capteur sélectionné ne possède pas les attributs de prix attendus. Nordpool : nécessite `raw_today`. PVPC : nécessite `price_00h` … `price_23h`. CKW : nécessite l'attribut `prices` avec une liste de créneaux. EPEX : nécessite l'attribut `data` avec une liste de créneaux. ENTSO-e : nécessite l'attribut `prices_today` avec une liste de créneaux."
     }
   },
@@ -702,6 +815,17 @@
         "fri": "Vendredi",
         "sat": "Samedi",
         "sun": "Dimanche"
+      }
+    },
+    "slot_mode": {
+      "options": {
+        "pd": "PD (algorithme prédictif)",
+        "manual": "Manuel (puissance forcée)"
+      }
+    },
+    "slot_battery_scope": {
+      "options": {
+        "all": "Toutes les batteries"
       }
     },
     "predictive_charging_mode": {
@@ -786,6 +910,18 @@
       "active_batteries": {
         "name": "Batteries Actives"
       },
+      "system_daily_solar_energy": {
+        "name": "Production Solaire Quotidienne"
+      },
+      "system_daily_home_energy": {
+        "name": "Consommation Domestique Quotidienne"
+      },
+      "system_daily_grid_import_energy": {
+        "name": "Importation Réseau Quotidienne"
+      },
+      "system_daily_grid_export_energy": {
+        "name": "Exportation Réseau Quotidienne"
+      },
       "non_responsive_batteries": {
         "name": "Batteries Non Réactives"
       },
@@ -816,7 +952,9 @@
           "ev_charger_pause": "Pause Chargeur VE",
           "ev_discharge_blocked": "Décharge VE Bloquée",
           "backup_mode": "Mode Secours",
+          "time_slot_manual": "Plage Manuelle",
           "no_discharge_slot": "Plage sans Décharge",
+          "no_charge_slot": "Plage sans Charge",
           "charging": "Charge",
           "discharging": "Décharge",
           "balanced": "En veille"
@@ -965,6 +1103,9 @@
       },
       "battery_cycle_count": {
         "name": "Cycles Batterie"
+      },
+      "balancing_mode": {
+        "name": "Mode d'Équilibrage"
       },
       "battery_cycle_count_calc": {
         "name": "Cycles Batterie (Calculé)"

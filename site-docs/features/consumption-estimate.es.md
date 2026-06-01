@@ -99,9 +99,9 @@ donde `n` puede ser menor de 7 si aún no hay suficientes días reales (los valo
 ```
 Lunes:  batería descargó 4,2 kWh + red a min SOC 0,8 kWh = 5,0 kWh
 Martes: batería descargó 5,1 kWh + red a min SOC 0,0 kWh = 5,1 kWh
-Miér:   batería descargó 3,8 kWh + red a min SOC 1,5 kWh = 5,3 kWh
-Jueves: batería descargó 4,5 kWh + red a min SOC 0,3 kWh = 4,8 kWh
-Vier:   batería descargó 4,9 kWh + red a min SOC 0,0 kWh = 4,9 kWh
+Miércoles: batería descargó 3,8 kWh + red a min SOC 1,5 kWh = 5,3 kWh
+Jueves:    batería descargó 4,5 kWh + red a min SOC 0,3 kWh = 4,8 kWh
+Viernes:   batería descargó 4,9 kWh + red a min SOC 0,0 kWh = 4,9 kWh
 Sábado: batería descargó 6,1 kWh + red a min SOC 0,2 kWh = 6,3 kWh
 Domingo:batería descargó 5,5 kWh + red a min SOC 0,5 kWh = 6,0 kWh
 

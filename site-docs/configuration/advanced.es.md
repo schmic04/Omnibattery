@@ -1,12 +1,17 @@
 # Opciones avanzadas
 
-Tras configurar la carga predictiva, el asistente ofrece cuatro pasos opcionales adicionales que ajustan el comportamiento de la integración en situaciones específicas.
+Tras configurar la carga predictiva, el asistente ofrece cinco pasos opcionales adicionales que ajustan el comportamiento de la integración en situaciones específicas.
 
 ---
 
 ## Carga semanal completa
 
 Fuerza una carga al **100 % una vez por semana** para equilibrar las celdas de la batería (cell balancing). Solo es necesario configurar el día de la semana.
+
+| Campo | Descripción | Por defecto |
+|---|---|---|
+| **Día de la semana** | En este día la batería cargará al 100% para equilibrar las celdas | — |
+| **Activar monitor de equilibrio de celdas** | Si está marcado, se activa el balanceo activo de celdas (puede ser *lento*) | Desactivado |
 
 Ver [Carga semanal completa](../features/weekly-full-charge.md) para el detalle de funcionamiento.
 
@@ -20,8 +25,10 @@ Retrasa la carga matutina desde la red mientras la producción solar prevista pu
 
 | Campo | Descripción | Por defecto |
 |---|---|---|
-| **Margen de seguridad** | Minutos antes del atardecer en los que la carga debe haber terminado | 60 min |
+| **Margen de seguridad (h)** | Horas antes del atardecer en las que la carga debe haber terminado | 1 h |
 | **Sensor de previsión solar** | Solo si no se configuró en el paso inicial | — |
+| **Activar SOC mínimo antes del retraso** | Si está activado, la batería cargará hasta el SOC configurado antes de aplicar el retraso solar | Desactivado |
+| **SOC mínimo (%)** | SOC de la batería a alcanzar antes de que se active el retraso de carga solar | — |
 
 Un margen mayor (p. ej. 180 min) desbloquea la carga desde la red más temprano; un margen menor espera más tiempo a que el sol cubra la energía.
 
@@ -43,6 +50,25 @@ Limita la descarga cuando el SOC cae por debajo de un umbral, cubriendo solo los
 Ver [Peak shaving](../features/peak-shaving.md) para el detalle de funcionamiento.
 
 ![Configuración de protección de capacidad](../assets/screenshots/configuration/advanced-capacity-protection-config.png){ width="650"  style="display: block; margin: 0 auto;"}
+
+---
+
+## Balance neto horario
+
+Registra la importación y exportación de red dentro de cada hora civil y ajusta el setpoint del controlador PD en tiempo real para llevar la energía neta hacia un objetivo configurable. El objetivo por defecto es 0 Wh — balance neto cero cada hora — pero puede desplazarse para permitir una importación fija o apuntar a una exportación fija.
+
+| Campo | Descripción | Por defecto |
+|---|---|---|
+| **Objetivo de balance neto (kWh)** | Balance neto de energía objetivo (0=neto cero, positivo=importación neta, negativo=exportación neta) | `0 kWh` |
+| **Offset máximo (W)** | Offset máximo de potencia que puede aplicar el controlador (suma de todas las baterías) | `1000 W` |
+| **Tolerancia de balance neto (kWh)** | Banda de tolerancia alrededor del objetivo (0=sin corrección) | `0 kWh` |
+| **Histéresis de offset (W)** | Cambio mínimo de offset antes de aplicar correcciones (0=aplicar cada ciclo) | `15 W` |
+
+Ver [Balance neto horario](../features/hourly-net-balance.md) para el detalle de funcionamiento.
+
+![Aviso de balance neto horario](../assets/screenshots/configuration/hourly_net_balance_warning.png){ width="650"  style="display: block; margin: 0 auto;"}
+
+![Configuración de balance neto horario](../assets/screenshots/configuration/hourly_net_balance_config.png){ width="650"  style="display: block; margin: 0 auto;"}
 
 ---
 

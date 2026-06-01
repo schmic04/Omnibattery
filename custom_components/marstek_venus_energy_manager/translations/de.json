@@ -8,12 +8,14 @@
           "consumption_sensor": "Netzverbrauchssensor",
           "solar_forecast_sensor": "Solarprognose-Sensor (optional)",
           "household_consumption_sensor": "Haushaltsverbrauchssensor (optional)",
+          "solar_production_sensor": "Solarproduktionssensor (optional)",
           "meter_inverted": "Zählervorzeichen invertiert"
         },
         "data_description": {
           "consumption_sensor": "Sensor, der importierte (+) oder exportierte (-) Leistung ins Netz anzeigt. Der Controller passt die Batterien an, um diesen Wert nahe 0W zu halten.",
           "solar_forecast_sensor": "Sensor, der die Solarproduktionsprognose in kWh liefert (z.B. Solcast). Wenn hier konfiguriert, wird er automatisch für prädiktive Ladung und Solarladungsverzögerung verwendet.",
           "household_consumption_sensor": "Leistungssensor (W) zur Messung des gesamten Haushaltsverbrauchs. Wenn konfiguriert, verwenden prädiktive Ladung und Ladungsverzögerung echte Verbrauchsdaten anstatt sie aus der Batterieentladung zu schätzen.",
+          "solar_production_sensor": "Echtzeit-PV-Produktionsleistungssensor (W/kW) von einem externen Wechselrichter, der nicht über die MPPT-Eingänge der Batterie geführt wird. Wird verwendet, um den Solar-Knoten im Energiefluss-Diagramm des Dashboards anzuzeigen. Leer lassen, wenn deine Module direkt den MPPT der Batterie speisen.",
           "meter_inverted": "Aktivieren Sie diese Option, wenn Ihr Zähler die umgekehrte Konvention verwendet: positiv = Export, negativ = Import. Die Einheit (W/kW) wird automatisch erkannt."
         }
       },
@@ -73,20 +75,64 @@
       },
       "add_time_slot": {
         "title": "Zeitfenster {slot_num}",
-        "description": "Definieren Sie ein Zeitfenster, in dem Batterien entladen werden DÜRFEN. Außerhalb dieses Zeitfensters wird nicht entladen.",
+        "description": "Legen Sie fest, wann und wie die Batterien arbeiten dürfen. Die Häkchen steuern jede Richtung, SOC und Leistung. Manueller Modus erzwingt eine exakte Leistung und umgeht den PD-Algorithmus.",
         "data": {
           "start_time": "Startzeit",
           "end_time": "Endzeit",
           "days": "Wochentage",
-          "apply_to_charge": "Auch auf Laden anwenden",
-          "target_grid_power": "Ziel-Netzleistung (W)"
+          "battery_scope": "Betroffene Batterie",
+          "allow_charge": "Laden erlauben",
+          "allow_discharge": "Entladen erlauben",
+          "soc_override_enabled": "SOC max/min des Fensters steuern",
+          "power_override_enabled": "Max. Lade-/Entladeleistung steuern",
+          "mode": "Betriebsmodus"
         },
         "data_description": {
-          "start_time": "Startzeit des Zeitfensters (24h-Format)",
-          "end_time": "Endzeit des Zeitfensters (24h-Format)",
-          "days": "Tage, an denen dieses Zeitfenster gilt",
-          "apply_to_charge": "Wenn aktiviert, schränkt das Zeitfenster auch das Laden ein (Batterie lädt nur während dieses Zeitfensters)",
-          "target_grid_power": "Netzleistung, auf die der Regler während dieses Zeitfensters reguliert. 0W = kein Netzfluss (Standard). Negativ = leichter Export (z.B. -150W). Positiv = leichter Import erlaubt."
+          "start_time": "Startzeit (24h). Mitternachtsübergang wird unterstützt.",
+          "end_time": "Endzeit (24h).",
+          "days": "Tage, an denen dieses Zeitfenster gilt.",
+          "battery_scope": "Wählen Sie 'all' für alle Batterien oder eine bestimmte.",
+          "allow_charge": "Wenn aktiviert, ist Laden während des Fensters erlaubt. Wenn KEIN Fenster Laden erlaubt, ist Laden standardmäßig frei.",
+          "allow_discharge": "Wenn aktiviert, ist Entladen während des Fensters erlaubt. Wenn KEIN Fenster Entladen erlaubt, ist Entladen standardmäßig frei.",
+          "soc_override_enabled": "Wenn aktiviert, überschreibt das Fenster den SOC max/min der Batterie.",
+          "power_override_enabled": "Wenn aktiviert, begrenzt oder erzwingt das Fenster die maximale Leistung.",
+          "mode": "PD: Der prädiktive Algorithmus regelt die Leistung mit dem Fenster-Limit. Manuell: Erzwungenes Entladen oder Laden bei der angegebenen Leistung."
+        }
+      },
+      "add_time_slot_details": {
+        "title": "Details des Fensters {slot_num}",
+        "description": "SOC- und/oder Leistungslimits pro Batterie konfigurieren. Jede Batterie hat eigene Regler. Zuordnung: {battery_map}. SOC-Min: 12–30%. SOC-Max: 80–100%. Leistung: 100 W bis zum Hardware-Maximum.",
+        "data": {
+          "battery_1__soc_min": "Batterie 1 — Min. SOC (%)",
+          "battery_1__soc_max": "Batterie 1 — Max. SOC (%)",
+          "battery_1__max_charge_power_w": "Batterie 1 — Max. Ladeleistung (W)",
+          "battery_1__max_discharge_power_w": "Batterie 1 — Max. Entladeleistung (W)",
+          "battery_2__soc_min": "Batterie 2 — Min. SOC (%)",
+          "battery_2__soc_max": "Batterie 2 — Max. SOC (%)",
+          "battery_2__max_charge_power_w": "Batterie 2 — Max. Ladeleistung (W)",
+          "battery_2__max_discharge_power_w": "Batterie 2 — Max. Entladeleistung (W)",
+          "battery_3__soc_min": "Batterie 3 — Min. SOC (%)",
+          "battery_3__soc_max": "Batterie 3 — Max. SOC (%)",
+          "battery_3__max_charge_power_w": "Batterie 3 — Max. Ladeleistung (W)",
+          "battery_3__max_discharge_power_w": "Batterie 3 — Max. Entladeleistung (W)",
+          "battery_4__soc_min": "Batterie 4 — Min. SOC (%)",
+          "battery_4__soc_max": "Batterie 4 — Max. SOC (%)",
+          "battery_4__max_charge_power_w": "Batterie 4 — Max. Ladeleistung (W)",
+          "battery_4__max_discharge_power_w": "Batterie 4 — Max. Entladeleistung (W)",
+          "battery_5__soc_min": "Batterie 5 — Min. SOC (%)",
+          "battery_5__soc_max": "Batterie 5 — Max. SOC (%)",
+          "battery_5__max_charge_power_w": "Batterie 5 — Max. Ladeleistung (W)",
+          "battery_5__max_discharge_power_w": "Batterie 5 — Max. Entladeleistung (W)",
+          "battery_6__soc_min": "Batterie 6 — Min. SOC (%)",
+          "battery_6__soc_max": "Batterie 6 — Max. SOC (%)",
+          "battery_6__max_charge_power_w": "Batterie 6 — Max. Ladeleistung (W)",
+          "battery_6__max_discharge_power_w": "Batterie 6 — Max. Entladeleistung (W)"
+        },
+        "data_description": {
+          "soc_min": "Batterie entlädt sich während des Fensters nicht unter diesen SOC (Untergrenze 12%).",
+          "soc_max": "Batterie lädt sich während des Fensters nicht über diesen SOC (Obergrenze 100%).",
+          "max_charge_power_w": "Im PD-Modus dynamisches Limit. Im manuellen Modus die exakte Ladeleistung.",
+          "max_discharge_power_w": "Im PD-Modus dynamisches Limit. Im manuellen Modus die exakte Entladeleistung."
         }
       },
       "add_more_slots": {
@@ -325,18 +371,37 @@
           "hourly_balance_deadband_wh": "Toleranzband um den Zielwert. Keine Korrektur, wenn die Nettobilanz innerhalb von ±N kWh liegt. 0 = exakte Korrektur.",
           "hourly_balance_hysteresis_w": "Minimale Änderung des Versatzes, bevor eine neue Korrektur angewendet wird. Verhindert Mikro-Anpassungen jeden Zyklus. 0 = immer anwenden. Standard: 15 W."
         }
+      },
+      "reconfigure_battery": {
+        "title": "Batterie {battery_num} neu konfigurieren — Verbindung",
+        "description": "Verbindungsdaten für Batterie {battery_num} aktualisieren. Leistungslimits, SOC-Limits und alle anderen Einstellungen bleiben erhalten.",
+        "data": {
+          "name": "Name",
+          "host": "IP-Adresse",
+          "port": "Modbus-Port",
+          "battery_version": "Batteriemodell"
+        },
+        "data_description": {
+          "name": "Beschreibender Name zur Identifikation dieser Batterie",
+          "host": "Neue IP-Adresse der Batterie im lokalen Netzwerk",
+          "port": "Modbus-Port (normalerweise 502)",
+          "battery_version": "Wählen Sie Ihre Batteriemodellversion"
+        }
       }
     },
     "error": {
       "cannot_connect": "Verbindung zur Batterie nicht möglich. Überprüfen Sie die IP-Adresse und dass die Batterie im Netzwerk erreichbar ist.",
       "sensor_not_found": "Solarprognose-Sensor existiert nicht. Überprüfen Sie, dass der Sensor verfügbar ist.",
       "invalid_unit": "Solarprognose-Sensor muss 'kWh' oder 'Wh' als Einheit haben.",
-      "overlapping_slots": "Dieses Zeitfenster überschneidet sich mit einem bestehenden. Passen Sie die Zeiten oder Tage an.",
+      "overlapping_slots": "Dieses Zeitfenster überschneidet sich mit einem bestehenden für dieselbe Batterie. Passen Sie Zeiten, Tage oder die Batterie an.",
       "midnight_crossing": "Die Startzeit muss vor der Endzeit liegen. Für Nachtperioden erstellen Sie zwei separate Zeitfenster (z.B. 22:00-23:59 und 00:00-06:00).",
+      "slot_does_nothing": "Das Zeitfenster muss mindestens eine Richtung erlauben (Laden oder Entladen).",
+      "manual_requires_power": "Manueller Modus benötigt aktivierte Leistungssteuerung.",
       "no_price_data": "Keine Preisdaten vom Sensor verfügbar. Nordpool: benötigt `raw_today`. PVPC: benötigt `price_00h` … `price_23h`. CKW: benötigt das Attribut `prices` mit einer Slot-Liste. EPEX: benötigt das Attribut `data` mit einer Slot-Liste. ENTSO-e: benötigt das Attribut `prices_today` mit einer Slot-Liste."
     },
     "abort": {
-      "already_configured": "Diese Integration ist bereits konfiguriert."
+      "already_configured": "Diese Integration ist bereits konfiguriert.",
+      "reconfigure_successful": "Verbindungseinstellungen der Batterie erfolgreich aktualisiert."
     }
   },
   "options": {
@@ -364,12 +429,14 @@
           "consumption_sensor": "Netzverbrauchssensor",
           "solar_forecast_sensor": "Solarprognose-Sensor (optional)",
           "household_consumption_sensor": "Haushaltsverbrauchssensor (optional)",
+          "solar_production_sensor": "Solarproduktionssensor (optional)",
           "meter_inverted": "Zählervorzeichen invertiert"
         },
         "data_description": {
           "consumption_sensor": "Sensor, der importierte (+) oder exportierte (-) Leistung ins Netz anzeigt.",
           "solar_forecast_sensor": "Sensor, der die Solarproduktionsprognose in kWh liefert (z.B. Solcast). Wenn hier konfiguriert, wird er automatisch für prädiktive Ladung und Solarladungsverzögerung verwendet.",
           "household_consumption_sensor": "Leistungssensor (W) zur Messung des gesamten Haushaltsverbrauchs. Wenn konfiguriert, verwenden prädiktive Ladung und Ladungsverzögerung echte Verbrauchsdaten anstatt sie aus der Batterieentladung zu schätzen.",
+          "solar_production_sensor": "Echtzeit-PV-Produktionsleistungssensor (W/kW) von einem externen Wechselrichter, der nicht über die MPPT-Eingänge der Batterie geführt wird. Wird verwendet, um den Solar-Knoten im Energiefluss-Diagramm des Dashboards anzuzeigen. Leer lassen, wenn deine Module direkt den MPPT der Batterie speisen.",
           "meter_inverted": "Aktivieren Sie diese Option, wenn Ihr Zähler die umgekehrte Konvention verwendet: positiv = Export, negativ = Import. Die Einheit (W/kW) wird automatisch erkannt."
         }
       },
@@ -429,20 +496,64 @@
       },
       "add_time_slot": {
         "title": "Zeitfenster {slot_num}",
-        "description": "Definieren oder ändern Sie ein Zeitfenster, in dem Batterien entladen werden DÜRFEN.",
+        "description": "Legen Sie fest, wann und wie die Batterien arbeiten dürfen. Die Häkchen steuern jede Richtung, SOC und Leistung. Manueller Modus erzwingt eine exakte Leistung und umgeht den PD-Algorithmus.",
         "data": {
           "start_time": "Startzeit",
           "end_time": "Endzeit",
           "days": "Wochentage",
-          "apply_to_charge": "Auch auf Laden anwenden",
-          "target_grid_power": "Ziel-Netzleistung (W)"
+          "battery_scope": "Betroffene Batterie",
+          "allow_charge": "Laden erlauben",
+          "allow_discharge": "Entladen erlauben",
+          "soc_override_enabled": "SOC max/min des Fensters steuern",
+          "power_override_enabled": "Max. Lade-/Entladeleistung steuern",
+          "mode": "Betriebsmodus"
         },
         "data_description": {
-          "start_time": "Startzeit des Zeitfensters (24h-Format)",
-          "end_time": "Endzeit des Zeitfensters (24h-Format)",
-          "days": "Tage, an denen dieses Zeitfenster gilt",
-          "apply_to_charge": "Wenn aktiviert, schränkt das Zeitfenster auch das Laden ein (Batterie lädt nur während dieses Zeitfensters)",
-          "target_grid_power": "Netzleistung, auf die der Regler während dieses Zeitfensters reguliert. 0W = kein Netzfluss (Standard). Negativ = leichter Export (z.B. -150W). Positiv = leichter Import erlaubt."
+          "start_time": "Startzeit (24h). Mitternachtsübergang wird unterstützt.",
+          "end_time": "Endzeit (24h).",
+          "days": "Tage, an denen dieses Zeitfenster gilt.",
+          "battery_scope": "Wählen Sie 'all' für alle Batterien oder eine bestimmte.",
+          "allow_charge": "Wenn aktiviert, ist Laden während des Fensters erlaubt. Wenn KEIN Fenster Laden erlaubt, ist Laden standardmäßig frei.",
+          "allow_discharge": "Wenn aktiviert, ist Entladen während des Fensters erlaubt. Wenn KEIN Fenster Entladen erlaubt, ist Entladen standardmäßig frei.",
+          "soc_override_enabled": "Wenn aktiviert, überschreibt das Fenster den SOC max/min der Batterie.",
+          "power_override_enabled": "Wenn aktiviert, begrenzt oder erzwingt das Fenster die maximale Leistung.",
+          "mode": "PD: Der prädiktive Algorithmus regelt die Leistung mit dem Fenster-Limit. Manuell: Erzwungenes Entladen oder Laden bei der angegebenen Leistung."
+        }
+      },
+      "add_time_slot_details": {
+        "title": "Details des Fensters {slot_num}",
+        "description": "SOC- und/oder Leistungslimits pro Batterie konfigurieren. Jede Batterie hat eigene Regler. Zuordnung: {battery_map}. SOC-Min: 12–30%. SOC-Max: 80–100%. Leistung: 100 W bis zum Hardware-Maximum.",
+        "data": {
+          "battery_1__soc_min": "Batterie 1 — Min. SOC (%)",
+          "battery_1__soc_max": "Batterie 1 — Max. SOC (%)",
+          "battery_1__max_charge_power_w": "Batterie 1 — Max. Ladeleistung (W)",
+          "battery_1__max_discharge_power_w": "Batterie 1 — Max. Entladeleistung (W)",
+          "battery_2__soc_min": "Batterie 2 — Min. SOC (%)",
+          "battery_2__soc_max": "Batterie 2 — Max. SOC (%)",
+          "battery_2__max_charge_power_w": "Batterie 2 — Max. Ladeleistung (W)",
+          "battery_2__max_discharge_power_w": "Batterie 2 — Max. Entladeleistung (W)",
+          "battery_3__soc_min": "Batterie 3 — Min. SOC (%)",
+          "battery_3__soc_max": "Batterie 3 — Max. SOC (%)",
+          "battery_3__max_charge_power_w": "Batterie 3 — Max. Ladeleistung (W)",
+          "battery_3__max_discharge_power_w": "Batterie 3 — Max. Entladeleistung (W)",
+          "battery_4__soc_min": "Batterie 4 — Min. SOC (%)",
+          "battery_4__soc_max": "Batterie 4 — Max. SOC (%)",
+          "battery_4__max_charge_power_w": "Batterie 4 — Max. Ladeleistung (W)",
+          "battery_4__max_discharge_power_w": "Batterie 4 — Max. Entladeleistung (W)",
+          "battery_5__soc_min": "Batterie 5 — Min. SOC (%)",
+          "battery_5__soc_max": "Batterie 5 — Max. SOC (%)",
+          "battery_5__max_charge_power_w": "Batterie 5 — Max. Ladeleistung (W)",
+          "battery_5__max_discharge_power_w": "Batterie 5 — Max. Entladeleistung (W)",
+          "battery_6__soc_min": "Batterie 6 — Min. SOC (%)",
+          "battery_6__soc_max": "Batterie 6 — Max. SOC (%)",
+          "battery_6__max_charge_power_w": "Batterie 6 — Max. Ladeleistung (W)",
+          "battery_6__max_discharge_power_w": "Batterie 6 — Max. Entladeleistung (W)"
+        },
+        "data_description": {
+          "soc_min": "Batterie entlädt sich während des Fensters nicht unter diesen SOC (Untergrenze 12%).",
+          "soc_max": "Batterie lädt sich während des Fensters nicht über diesen SOC (Obergrenze 100%).",
+          "max_charge_power_w": "Im PD-Modus dynamisches Limit. Im manuellen Modus die exakte Ladeleistung.",
+          "max_discharge_power_w": "Im PD-Modus dynamisches Limit. Im manuellen Modus die exakte Entladeleistung."
         }
       },
       "add_more_slots": {
@@ -687,8 +798,10 @@
       "cannot_connect": "Verbindung zur Batterie nicht möglich. Überprüfen Sie die IP-Adresse und dass die Batterie im Netzwerk erreichbar ist.",
       "sensor_not_found": "Solarprognose-Sensor existiert nicht. Überprüfen Sie, dass der Sensor verfügbar ist.",
       "invalid_unit": "Solarprognose-Sensor muss 'kWh' oder 'Wh' als Einheit haben.",
-      "overlapping_slots": "Dieses Zeitfenster überschneidet sich mit einem bestehenden. Passen Sie die Zeiten oder Tage an.",
+      "overlapping_slots": "Dieses Zeitfenster überschneidet sich mit einem bestehenden für dieselbe Batterie. Passen Sie Zeiten, Tage oder die Batterie an.",
       "midnight_crossing": "Die Startzeit muss vor der Endzeit liegen. Für Nachtperioden erstellen Sie zwei separate Zeitfenster (z.B. 22:00-23:59 und 00:00-06:00).",
+      "slot_does_nothing": "Das Zeitfenster muss mindestens eine Richtung erlauben (Laden oder Entladen).",
+      "manual_requires_power": "Manueller Modus benötigt aktivierte Leistungssteuerung.",
       "no_price_data": "Keine Preisdaten vom Sensor verfügbar. Nordpool: benötigt `raw_today`. PVPC: benötigt `price_00h` … `price_23h`. CKW: benötigt das Attribut `prices` mit einer Slot-Liste. EPEX: benötigt das Attribut `data` mit einer Slot-Liste. ENTSO-e: benötigt das Attribut `prices_today` mit einer Slot-Liste."
     }
   },
@@ -702,6 +815,17 @@
         "fri": "Freitag",
         "sat": "Samstag",
         "sun": "Sonntag"
+      }
+    },
+    "slot_mode": {
+      "options": {
+        "pd": "PD (prädiktiver Algorithmus)",
+        "manual": "Manuell (erzwungene Leistung)"
+      }
+    },
+    "slot_battery_scope": {
+      "options": {
+        "all": "Alle Batterien"
       }
     },
     "predictive_charging_mode": {
@@ -786,6 +910,18 @@
       "active_batteries": {
         "name": "Aktive Batterien"
       },
+      "system_daily_solar_energy": {
+        "name": "Tägliche Solarproduktion"
+      },
+      "system_daily_home_energy": {
+        "name": "Täglicher Haushaltsverbrauch"
+      },
+      "system_daily_grid_import_energy": {
+        "name": "Täglicher Netzbezug"
+      },
+      "system_daily_grid_export_energy": {
+        "name": "Tägliche Netzeinspeisung"
+      },
       "non_responsive_batteries": {
         "name": "Nicht reagierende Batterien"
       },
@@ -816,7 +952,9 @@
           "ev_charger_pause": "EV-Ladepause",
           "ev_discharge_blocked": "EV-Entladung Blockiert",
           "backup_mode": "Backup-Modus",
+          "time_slot_manual": "Manuelles Zeitfenster",
           "no_discharge_slot": "Entlade-Sperrzeit",
+          "no_charge_slot": "Lade-Sperrzeit",
           "charging": "Laden",
           "discharging": "Entladen",
           "balanced": "Standby"
@@ -965,6 +1103,9 @@
       },
       "battery_cycle_count": {
         "name": "Batteriezyklen"
+      },
+      "balancing_mode": {
+        "name": "Balancier-Modus"
       },
       "battery_cycle_count_calc": {
         "name": "Batteriezyklen (Berechnet)"

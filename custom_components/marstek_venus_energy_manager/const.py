@@ -425,7 +425,7 @@ SENSOR_DEFINITIONS = [
         "icon": "mdi:ticket-confirmation-outline",
         "category": "diagnostic",
         "key": "software_version",
-        "enabled_by_default": False,
+        "enabled_by_default": True,
         "data_type": "uint16",
         "precision": 2,
         "scan_interval": "very_low",
@@ -437,7 +437,7 @@ SENSOR_DEFINITIONS = [
         "icon": "mdi:battery-check-outline",
         "category": "diagnostic",
         "key": "bms_version",
-        "enabled_by_default": False,
+        "enabled_by_default": True,
         "data_type": "uint16",
         "precision": 0,
         "scan_interval": "very_low",
@@ -449,7 +449,7 @@ SENSOR_DEFINITIONS = [
         "icon": "mdi:ticket-confirmation-outline",
         "category": "diagnostic",
         "key": "ems_version",
-        "enabled_by_default": False,
+        "enabled_by_default": True,
         "data_type": "uint16",
         "scale": 1,
         "precision": 0,
@@ -463,7 +463,7 @@ SENSOR_DEFINITIONS = [
         "icon": "mdi:ticket-confirmation-outline",
         "category": "diagnostic",
         "key": "comm_module_firmware",
-        "enabled_by_default": False,
+        "enabled_by_default": True,
         "data_type": "char",
         "precision": 0,
         "scan_interval": "very_low",
@@ -488,7 +488,7 @@ SENSOR_DEFINITIONS = [
         "device_class": "signal_strength",
         "state_class": "measurement",
         "key": "wifi_signal_strength",
-        "enabled_by_default": False,
+        "enabled_by_default": True,
         "data_type": "uint16",
         "category": "diagnostic",
         "precision": 0,
@@ -509,7 +509,7 @@ BINARY_SENSOR_DEFINITIONS = [
         "device_class": "connectivity",
         "icon": "mdi:check-network-outline",
         "key": "wifi_status",
-        "enabled_by_default": False,
+        "enabled_by_default": True,
         "scan_interval": "low",
     },
     {
@@ -957,7 +957,7 @@ SENSOR_DEFINITIONS_V3 = [
         "icon": "mdi:battery-check-outline",
         "category": "diagnostic",
         "key": "bms_version",
-        "enabled_by_default": False,
+        "enabled_by_default": True,
         "data_type": "uint16",
         "precision": 0,
         "scan_interval": "very_low",
@@ -981,7 +981,7 @@ SENSOR_DEFINITIONS_V3 = [
         "icon": "mdi:ticket-confirmation-outline",
         "category": "diagnostic",
         "key": "ems_version",
-        "enabled_by_default": False,
+        "enabled_by_default": True,
         "data_type": "uint16",
         "scale": 1,
         "precision": 0,
@@ -995,7 +995,7 @@ SENSOR_DEFINITIONS_V3 = [
         "icon": "mdi:ticket-confirmation-outline",
         "category": "diagnostic",
         "key": "comm_module_firmware",
-        "enabled_by_default": False,
+        "enabled_by_default": True,
         "data_type": "char",
         "precision": 0,
         "scan_interval": "very_low",
@@ -1020,7 +1020,7 @@ SENSOR_DEFINITIONS_V3 = [
         "device_class": "signal_strength",
         "state_class": "measurement",
         "key": "wifi_signal_strength",
-        "enabled_by_default": False,
+        "enabled_by_default": True,
         "data_type": "uint16",
         "category": "diagnostic",
         "precision": 0,
@@ -1038,7 +1038,7 @@ BINARY_SENSOR_DEFINITIONS_V3 = [
         "device_class": "connectivity",
         "icon": "mdi:check-network-outline",
         "key": "wifi_status",
-        "enabled_by_default": False,
+        "enabled_by_default": True,
         "scan_interval": "low",
     },
     {
@@ -1051,6 +1051,18 @@ BINARY_SENSOR_DEFINITIONS_V3 = [
         "icon": "mdi:cloud-outline",
         "key": "cloud_status",
         "enabled_by_default": False,
+        "scan_interval": "low",
+    },
+    {
+        "name": "Balancing Mode",
+        "register": 34009,
+        "data_type": "uint16",
+        "unit": None,
+        "category": "diagnostic",
+        "device_class": "running",
+        "icon": "mdi:scale-balance",
+        "key": "balancing_mode",
+        "enabled_by_default": True,
         "scan_interval": "low",
     },
 ]
@@ -1417,7 +1429,7 @@ SENSOR_DEFINITIONS_VA = [
         "icon": "mdi:battery-check-outline",
         "category": "diagnostic",
         "key": "bms_version",
-        "enabled_by_default": False,
+        "enabled_by_default": True,
         "data_type": "uint16",
         "precision": 0,
         "scan_interval": "very_low",
@@ -1441,7 +1453,7 @@ SENSOR_DEFINITIONS_VA = [
         "icon": "mdi:ticket-confirmation-outline",
         "category": "diagnostic",
         "key": "ems_version",
-        "enabled_by_default": False,
+        "enabled_by_default": True,
         "data_type": "uint16",
         "scale": 1,
         "precision": 0,
@@ -1455,7 +1467,7 @@ SENSOR_DEFINITIONS_VA = [
         "icon": "mdi:ticket-confirmation-outline",
         "category": "diagnostic",
         "key": "comm_module_firmware",
-        "enabled_by_default": False,
+        "enabled_by_default": True,
         "data_type": "char",
         "precision": 0,
         "scan_interval": "very_low",
@@ -1519,7 +1531,7 @@ SENSOR_DEFINITIONS_VA = [
         "device_class": "signal_strength",
         "state_class": "measurement",
         "key": "wifi_signal_strength",
-        "enabled_by_default": False,
+        "enabled_by_default": True,
         "data_type": "uint16",
         "category": "diagnostic",
         "precision": 0,
@@ -1540,7 +1552,7 @@ _WIFI_CLOUD_BINARY_SENSORS = [
         "device_class": "connectivity",
         "icon": "mdi:check-network-outline",
         "key": "wifi_status",
-        "enabled_by_default": False,
+        "enabled_by_default": True,
         "scan_interval": "low",
     },
     {
@@ -1794,8 +1806,40 @@ CYCLE_SENSOR_DEFINITIONS = [
 CONF_ENABLE_PREDICTIVE_CHARGING = "enable_predictive_charging"
 CONF_CHARGING_TIME_SLOT = "charging_time_slot"
 CONF_SOLAR_FORECAST_SENSOR = "solar_forecast_sensor"
+CONF_SOLAR_PRODUCTION_SENSOR = "solar_production_sensor"
 CONF_HOUSEHOLD_CONSUMPTION_SENSOR = "household_consumption_sensor"
 CONF_MAX_CONTRACTED_POWER = "max_contracted_power"
+
+# Time slots (operation slots) — v3 schema keys
+CONF_TIME_SLOTS = "no_discharge_time_slots"  # legacy key, kept for compat
+CONF_SLOT_START_TIME = "start_time"
+CONF_SLOT_END_TIME = "end_time"
+CONF_SLOT_DAYS = "days"
+CONF_SLOT_ENABLED = "enabled"
+CONF_SLOT_BATTERY_SCOPE = "battery_scope"
+CONF_SLOT_ALLOW_CHARGE = "allow_charge"
+CONF_SLOT_ALLOW_DISCHARGE = "allow_discharge"
+CONF_SLOT_SOC_OVERRIDE_ENABLED = "soc_override_enabled"
+CONF_SLOT_SOC_MAX = "soc_max"
+CONF_SLOT_SOC_MIN = "soc_min"
+CONF_SLOT_POWER_OVERRIDE_ENABLED = "power_override_enabled"
+CONF_SLOT_MAX_CHARGE_POWER_W = "max_charge_power_w"
+CONF_SLOT_MAX_DISCHARGE_POWER_W = "max_discharge_power_w"
+CONF_SLOT_MODE = "mode"
+
+SLOT_BATTERY_SCOPE_ALL = "all"
+SLOT_MODE_PD = "pd"
+SLOT_MODE_MANUAL = "manual"
+
+DEFAULT_SLOT_BATTERY_SCOPE = SLOT_BATTERY_SCOPE_ALL
+DEFAULT_SLOT_ALLOW_CHARGE = False
+DEFAULT_SLOT_ALLOW_DISCHARGE = True
+DEFAULT_SLOT_SOC_OVERRIDE_ENABLED = False
+DEFAULT_SLOT_POWER_OVERRIDE_ENABLED = False
+DEFAULT_SLOT_MODE = SLOT_MODE_PD
+DEFAULT_SLOT_SOC_MIN_FLOOR = 12
+DEFAULT_SLOT_SOC_MAX_CEILING = 100
+MAX_TIME_SLOTS = 8
 
 # Default base consumption fallback (kWh/day)
 DEFAULT_BASE_CONSUMPTION_KWH = 5.0  # Fallback when no consumption history available
@@ -1820,12 +1864,21 @@ CONF_ENABLE_BALANCE_MONITOR = "enable_balance_monitor"
 # Cell Balance Monitor
 BALANCE_STORAGE_KEY = "balance_history"
 BALANCE_STORAGE_VERSION = 1
-BALANCE_THRESHOLD_YELLOW = 50    # mV — above this: yellow
-BALANCE_THRESHOLD_ORANGE = 100   # mV — above this: orange
-BALANCE_THRESHOLD_RED = 150      # mV — above this: red
+# Marstek cells ship from the factory with a sizeable top-of-charge imbalance
+# (commonly ~170-180 mV). At 3.55 V the LiFePO4 curve is very steep, so this
+# factory spread is normal — not a fault. The status thresholds below are
+# absolute raw-delta values chosen to sit above that factory baseline, so a
+# fresh battery reads green. The baseline offset is subtracted only in the
+# rising-trend magnitude gate, so steady factory-level readings do not trip a
+# trend alert (slope is unaffected — subtracting a constant does not change it).
+BALANCE_BASELINE_OFFSET_MV = 180  # mV — factory top-of-charge imbalance, used by the trend gate
+BALANCE_THRESHOLD_YELLOW = 200    # mV — raw delta above this: yellow
+BALANCE_THRESHOLD_ORANGE = 230    # mV — raw delta above this: orange
+BALANCE_THRESHOLD_RED = 250       # mV — raw delta above this: red
 BALANCE_HISTORY_MAX = 52         # ~1 year of weekly readings
 BALANCE_RED_CONSECUTIVE_ALERT = 2
-BALANCE_TREND_ALERT_AVG_MV = 75.0   # avg must exceed this to fire a rising-trend alert
+BALANCE_TREND_ALERT_AVG_MV = 40.0   # baseline-corrected avg must exceed this (raw avg > 220 mV) to fire a rising-trend alert
+BALANCE_NOTIFY_COOLDOWN_DAYS = 7    # min days between cell-imbalance notifications per battery
 
 # Optional normal full-charge protection.
 # When enabled per battery, slow charging only while the target is 100% and
@@ -1847,7 +1900,7 @@ ACTIVE_BALANCE_MEASURE_WAIT_SECONDS = 60
 ACTIVE_BALANCE_ADAPTIVE_RESUME_STEP_V = 0.01
 ACTIVE_BALANCE_ADAPTIVE_MIN_RESUME_CELL_VOLTAGE = 3.40
 ACTIVE_BALANCE_CHARGE_POWER_W = 95
-ACTIVE_BALANCE_DISCHARGE_POWER_W = 25
+ACTIVE_BALANCE_DISCHARGE_POWER_W = 200
 ACTIVE_BALANCE_MODE_TARGET_DELTA_V = 0.03
 
 # Per-battery scheduled active balance mode.

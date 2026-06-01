@@ -1,8 +1,8 @@
 """Active balance mode for Marstek Venus.
 
 Owns the scheduled per-battery active balancing run:
-- State machine: PRE_TOP_CHARGE -> CHARGE_50W -> WAIT_MEASURE ->
-  DISCHARGE_25W / FINAL_DISCHARGE_25W.
+- State machine: PRE_TOP_CHARGE -> CHARGE -> WAIT_MEASURE ->
+  DISCHARGE / FINAL_DISCHARGE.
 - Adaptive charge-resume voltage with BMS-rejection detection.
 - Temporary max_soc / hardware cutoff override so PD can drive the battery
   to 100% during the pre-top run-up.
@@ -59,19 +59,22 @@ class ActiveBalanceModeManager:
                 and saved_phase
                 in {
                     "PRE_TOP_CHARGE",
-                    "CHARGE_50W",
+                    "CHARGE",
                     "WAIT_MEASURE",
+                    "DISCHARGE",
+                    "FINAL_DISCHARGE",
+                    "HOLD",
+                    # legacy phase labels (pre power-name removal)
+                    "CHARGE_50W",
                     "DISCHARGE_25W",
                     "FINAL_DISCHARGE_25W",
-                    "CHARGE",
-                    "HOLD",
-                    "DISCHARGE",
                 }
             ):
                 legacy_map = {
-                    "CHARGE": "CHARGE_50W",
-                    "HOLD": "CHARGE_50W",
-                    "DISCHARGE": "DISCHARGE_25W",
+                    "CHARGE_50W": "CHARGE",
+                    "HOLD": "CHARGE",
+                    "DISCHARGE_25W": "DISCHARGE",
+                    "FINAL_DISCHARGE_25W": "FINAL_DISCHARGE",
                 }
                 self._active_balance_mode_phases[coordinator] = legacy_map.get(
                     saved_phase,
@@ -94,12 +97,27 @@ class ActiveBalanceModeManager:
         coordinator,
         vmax_f: float,
     ) -> float:
-        """Lower the charge retry point by 1 mV after the BMS rejects charge."""
+        """Lower the charge retry point after the BMS rejects charge.
+
+        Steps the retry voltage down by ``ACTIVE_BALANCE_ADAPTIVE_RESUME_STEP_V``,
+        but also forces it strictly below the voltage at which the charge was
+        rejected. Without the vmax-relative bound a BMS that refuses charge at a
+        low resting voltage (e.g. SOC-100 full lockout at vmax ~3.48 V) leaves the
+        DISCHARGE target (min(retry, stop)) at or above the current vmax, so the
+        escape discharge never runs and the run ping-pongs between CHARGE and
+        DISCHARGE forever. Bounding by vmax guarantees a real discharge that drops
+        SOC off the lockout so the next charge is accepted. In the original
+        high-vmax OVP case (rejection near the stop voltage) the current-step
+        bound still dominates, so behaviour there is unchanged.
+        """
         current = self._active_balance_charge_resume_target(coordinator)
         next_target = round(
             max(
                 ACTIVE_BALANCE_ADAPTIVE_MIN_RESUME_CELL_VOLTAGE,
-                current - ACTIVE_BALANCE_ADAPTIVE_RESUME_STEP_V,
+                min(
+                    current - ACTIVE_BALANCE_ADAPTIVE_RESUME_STEP_V,
+                    vmax_f - ACTIVE_BALANCE_ADAPTIVE_RESUME_STEP_V,
+                ),
             ),
             3,
         )
@@ -119,7 +137,13 @@ class ActiveBalanceModeManager:
         coordinator,
         phase: str,
     ) -> bool:
-        """Return True when the BMS ACKs a charge setpoint but delivers no charge."""
+        """Return True when the BMS rejects a charge command but delivers no charge.
+
+        Two BMS OVP failure modes are covered:
+        - BMS keeps inv_state=2 (Charge mode) while delivering 0W after OVP cut.
+        - BMS reverts both force_mode and set_charge_power registers; intent is
+          tracked via coordinator._ab_charge_cmd_active set at end of each cycle.
+        """
         if phase not in {"CHARGE", "HOLD"}:
             return False
         data = coordinator.data or {}
@@ -135,12 +159,13 @@ class ActiveBalanceModeManager:
                     set_charge_power is not None
                     and float(set_charge_power) > 0
                 )
+                or getattr(coordinator, "_ab_charge_cmd_active", False)
             )
             return (
                 charge_was_requested
                 and power is not None
                 and abs(float(power)) <= 10
-                and inv_state == 1
+                and inv_state in {1, 2}
             )
         except (TypeError, ValueError):
             return False
@@ -256,6 +281,15 @@ class ActiveBalanceModeManager:
         except (TypeError, ValueError):
             return "n/a"
 
+    def _format_delta_mv(self, value_v) -> str:
+        """Format a delta stored in volts as mV, matching the Cell Delta sensor."""
+        if value_v is None:
+            return "n/a"
+        try:
+            return f"{float(value_v) * 1000:.0f} mV"
+        except (TypeError, ValueError):
+            return "n/a"
+
     def _active_balance_notification_id(
         self,
         coordinator,
@@ -312,22 +346,13 @@ class ActiveBalanceModeManager:
         started_ts: str,
     ) -> None:
         """Send a persistent notification when a scheduled balance run starts."""
-        start_vmax = getattr(coordinator, "active_balance_mode_start_max_cell_voltage", None)
-        start_vmin = getattr(coordinator, "active_balance_mode_start_min_cell_voltage", None)
         start_delta = getattr(coordinator, "active_balance_mode_start_delta_mv", None)
-        start_delta_source = getattr(coordinator, "active_balance_mode_start_delta_source", None)
         message = "\n".join(
             [
-                f"🔋 Battery: {coordinator.name}",
-                f"▶️ Started: {started_ts}",
-                f"Max duration: until delta <= {ACTIVE_BALANCE_MODE_TARGET_DELTA_V:.3f} V or manual stop",
-                f"Target delta: <= {ACTIVE_BALANCE_MODE_TARGET_DELTA_V:.3f} V",
-                f"Initial delta: {self._format_active_balance_value(start_delta, 'V', 4)}",
-                f"🧾 Initial delta source: {start_delta_source or 'n/a'}",
-                f"🔺 Initial max cell: {self._format_active_balance_value(start_vmax, 'V', 3)}",
-                f"🔻 Initial min cell: {self._format_active_balance_value(start_vmin, 'V', 3)}",
-                "",
-                "🚫 While running, this battery is excluded from normal PD control.",
+                f"📊 Initial delta: {self._format_delta_mv(start_delta)}",
+                f"🎯 Runs until delta ≤ {ACTIVE_BALANCE_MODE_TARGET_DELTA_V * 1000:.0f} mV "
+                f"or you stop it.",
+                "🚫 Battery paused from normal control while balancing.",
             ]
         )
         try:
@@ -366,21 +391,19 @@ class ActiveBalanceModeManager:
             "disabled": "Stopped by user",
         }.get(reason, reason)
 
-        final_vmax = getattr(coordinator, "active_balance_mode_last_cutoff_max_cell_voltage", None)
-        final_vmin = getattr(coordinator, "active_balance_mode_last_cutoff_min_cell_voltage", None)
         final_delta = getattr(coordinator, "active_balance_mode_last_cutoff_delta_v", None)
         if final_delta is None:
             final_delta = getattr(coordinator, "active_balance_mode_last_cutoff_delta_mv", None)
-        final_delta_source = getattr(coordinator, "active_balance_mode_last_cutoff_source", None)
-        final_cutoff_ts = getattr(coordinator, "active_balance_mode_last_cutoff_ts", None)
-        final_cutoff_soc = getattr(coordinator, "active_balance_mode_last_cutoff_soc", None)
         if final_delta is None:
-            final_vmax, final_vmin, final_delta = self._active_balance_mode_cell_values(coordinator)
-            final_delta_source = "instant"
+            monitor = getattr(self._controller, "_balance_monitor", None)
+            if monitor is not None:
+                readings = monitor.get_recent_readings(coordinator.host, limit=1)
+                if readings:
+                    try:
+                        final_delta = float(readings[-1].get("delta_mV")) / 1000.0
+                    except (TypeError, ValueError):
+                        final_delta = None
         start_delta = getattr(coordinator, "active_balance_mode_start_delta_mv", None)
-        start_delta_source = getattr(coordinator, "active_balance_mode_start_delta_source", None)
-        start_vmax = getattr(coordinator, "active_balance_mode_start_max_cell_voltage", None)
-        start_vmin = getattr(coordinator, "active_balance_mode_start_min_cell_voltage", None)
         improvement = None
         if start_delta is not None and final_delta is not None:
             try:
@@ -390,23 +413,11 @@ class ActiveBalanceModeManager:
 
         message = "\n".join(
             [
-                f"🔋 Battery: {coordinator.name}",
-                f"✅ Result: {reason_text}",
-                f"▶️ Started: {started_ts or 'n/a'}",
+                f"✅ {reason_text}",
+                f"📊 Delta: {self._format_delta_mv(start_delta)} → "
+                f"{self._format_delta_mv(final_delta)} "
+                f"(improvement {self._format_delta_mv(improvement)})",
                 f"⏱️ Duration: {self._format_active_balance_value(elapsed_h, 'h', 2)}",
-                "",
-                f"Initial delta: {self._format_active_balance_value(start_delta, 'V', 4)}",
-                f"🧾 Initial delta source: {start_delta_source or 'n/a'}",
-                f"Final delta: {self._format_active_balance_value(final_delta, 'V', 4)}",
-                f"Final delta source: {final_delta_source or 'n/a'}",
-                f"Last 3.58 V measurement: {final_cutoff_ts or 'n/a'}",
-                f"SOC at last cutoff: {self._format_active_balance_value(final_cutoff_soc, '%')}",
-                f"Improvement: {self._format_active_balance_value(improvement, 'V', 4)}",
-                "",
-                f"🔺 Initial max cell: {self._format_active_balance_value(start_vmax, 'V', 3)}",
-                f"🔻 Initial min cell: {self._format_active_balance_value(start_vmin, 'V', 3)}",
-                f"🔺 Final max cell: {self._format_active_balance_value(final_vmax, 'V', 3)}",
-                f"🔻 Final min cell: {self._format_active_balance_value(final_vmin, 'V', 3)}",
             ]
         )
         try:
@@ -745,23 +756,47 @@ class ActiveBalanceModeManager:
                     )
                 except (TypeError, ValueError):
                     vmax_high = False
-                if vmax_high:
+                try:
+                    soc_f = float(soc_now) if soc_now is not None else None
+                except (TypeError, ValueError):
+                    soc_f = None
+                # A near-full pack reports SOC ~100% while the resting max-cell
+                # voltage can still sit below the resume threshold. In that state
+                # the BMS refuses the high-power pre-top charge (delivers ~0 W in
+                # Standby), so vmax never climbs to
+                # ACTIVE_BALANCE_CHARGE_RESUME_CELL_VOLTAGE and PRE_TOP_CHARGE
+                # would hammer max_charge_power forever. Treat near-full SOC, or a
+                # charge the BMS is rejecting at high SOC, as "top reached" and
+                # hand off to the low-power CHARGE phase whose 95 W trickle the
+                # BMS still accepts.
+                soc_at_top = soc_f is not None and soc_f >= 99
+                pre_top_charge_stalled = (
+                    soc_f is not None
+                    and soc_f >= 95
+                    and self._active_balance_charge_rejected_detected(coordinator, "CHARGE")
+                )
+                if vmax_high or soc_at_top or pre_top_charge_stalled:
                     top_reached = True
                     coordinator.active_balance_mode_top_reached = True
-                    coordinator.active_balance_mode_phase = "CHARGE_50W"
-                    self._active_balance_mode_phases[coordinator] = "CHARGE_50W"
+                    coordinator.active_balance_mode_phase = "CHARGE"
+                    self._active_balance_mode_phases[coordinator] = "CHARGE"
                     self._controller._persist_battery_runtime_config(
                         coordinator,
                         {
                             "active_balance_mode_top_reached": True,
-                            "active_balance_mode_phase": "CHARGE_50W",
+                            "active_balance_mode_phase": "CHARGE",
                         },
                     )
                     _LOGGER.info(
-                        "%s: active balance mode reached top-balance zone (soc=%s, vmax=%s)",
+                        "%s: active balance mode reached top-balance zone "
+                        "(soc=%s, vmax=%s, vmax_high=%s, soc_at_top=%s, "
+                        "charge_stalled=%s)",
                         coordinator.name,
                         soc_now,
                         vmax_now,
+                        vmax_high,
+                        soc_at_top,
+                        pre_top_charge_stalled,
                     )
 
             if not top_reached:
@@ -808,12 +843,13 @@ class ActiveBalanceModeManager:
             phase = (
                 self._active_balance_mode_phases.get(coordinator)
                 or getattr(coordinator, "active_balance_mode_phase", None)
-                or "CHARGE_50W"
+                or "CHARGE"
             )
             legacy_phase_map = {
-                "CHARGE": "CHARGE_50W",
-                "HOLD": "CHARGE_50W",
-                "DISCHARGE": "DISCHARGE_25W",
+                "CHARGE_50W": "CHARGE",
+                "HOLD": "CHARGE",
+                "DISCHARGE_25W": "DISCHARGE",
+                "FINAL_DISCHARGE_25W": "FINAL_DISCHARGE",
             }
             phase = legacy_phase_map.get(phase, phase)
             previous_phase = self._active_balance_mode_phases.get(coordinator)
@@ -825,7 +861,7 @@ class ActiveBalanceModeManager:
                 retry_voltage = self._active_balance_charge_resume_target(coordinator)
             charge_rejected = self._active_balance_charge_rejected_detected(
                 coordinator,
-                "CHARGE" if phase in {"CHARGE_50W", "WAIT_MEASURE"} else phase,
+                "CHARGE" if phase in {"CHARGE", "WAIT_MEASURE"} else phase,
             )
             # Only treat as a real BMS rejection when we are still below the
             # configured stop voltage. At/above it the cutoff is the expected
@@ -834,9 +870,9 @@ class ActiveBalanceModeManager:
             if charge_rejected and vmax_f < ACTIVE_BALANCE_CHARGE_STOP_CELL_VOLTAGE:
                 retry_voltage = self._lower_active_balance_charge_resume_target(coordinator, vmax_f)
                 coordinator.active_balance_mode_retry_voltage = retry_voltage
-                phase = "DISCHARGE_25W"
+                phase = "DISCHARGE"
 
-            if phase == "CHARGE_50W":
+            if phase == "CHARGE":
                 if vmax_f >= ACTIVE_BALANCE_CHARGE_STOP_CELL_VOLTAGE:
                     phase = "WAIT_MEASURE"
                     coordinator.active_balance_mode_wait_started_ts = now.isoformat()
@@ -863,19 +899,19 @@ class ActiveBalanceModeManager:
                     )
                     coordinator.active_balance_mode_wait_started_ts = None
                     if delta_v <= ACTIVE_BALANCE_MODE_TARGET_DELTA_V:
-                        phase = "FINAL_DISCHARGE_25W"
+                        phase = "FINAL_DISCHARGE"
                     else:
-                        phase = "DISCHARGE_25W"
-            elif phase == "DISCHARGE_25W":
+                        phase = "DISCHARGE"
+            elif phase == "DISCHARGE":
                 target_voltage = min(float(retry_voltage), ACTIVE_BALANCE_DISCHARGE_STOP_CELL_VOLTAGE)
                 if vmax_f > target_voltage:
                     discharge_power = ACTIVE_BALANCE_DISCHARGE_POWER_W
                 else:
-                    phase = "CHARGE_50W"
+                    phase = "CHARGE"
                     coordinator.active_balance_mode_retry_voltage = None
                     self._reset_active_balance_charge_resume_target(coordinator)
                     charge_power = ACTIVE_BALANCE_CHARGE_POWER_W
-            elif phase == "FINAL_DISCHARGE_25W":
+            elif phase == "FINAL_DISCHARGE":
                 if vmax_f > ACTIVE_BALANCE_FINAL_DISCHARGE_STOP_CELL_VOLTAGE:
                     discharge_power = ACTIVE_BALANCE_DISCHARGE_POWER_W
                 else:
@@ -894,7 +930,7 @@ class ActiveBalanceModeManager:
                     }
                     continue
             else:
-                phase = "CHARGE_50W"
+                phase = "CHARGE"
                 charge_power = ACTIVE_BALANCE_CHARGE_POWER_W
 
             self._active_balance_mode_phases[coordinator] = phase
@@ -917,6 +953,7 @@ class ActiveBalanceModeManager:
                 },
             )
 
+            coordinator._ab_charge_cmd_active = charge_power > 0
             await self._controller._set_battery_power(
                 coordinator,
                 charge_power,

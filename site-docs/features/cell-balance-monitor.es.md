@@ -157,10 +157,10 @@ La integración envía notificaciones persistentes de Home Assistant en estos ca
 
 | Evento | Título de la notificación |
 |---|---|
-| Lectura naranja o roja en tensión alta | Cell imbalance - `{nombre de la batería}` |
-| Rojo en 2 o más cargas completas consecutivas | Possible degraded cell - `{nombre de la batería}` |
-| Tendencia creciente con media por encima de 75 mV | Rising imbalance trend - `{nombre de la batería}` |
-| Inicio/final del modo de balanceo activo | Active balancing started/finished - `{nombre de la batería}` |
+| Lectura naranja o roja en tensión alta | Desbalanceo de celdas - `{nombre de la batería}` |
+| Rojo en 2 o más cargas completas consecutivas | Posible celda degradada - `{nombre de la batería}` |
+| Tendencia creciente con media por encima de 75 mV | Tendencia de desbalanceo creciente - `{nombre de la batería}` |
+| Inicio/final del modo de balanceo activo | Balanceo activo iniciado/finalizado - `{nombre de la batería}` |
 
 ## Entidades de sensor
 

@@ -1,4 +1,4 @@
-# Peak shaving
+# Protección de capacidad (también conocido como peak shaving)
 
 Reserva parte de la capacidad de la batería para satisfacer picos de demanda que superen un umbral de potencia configurable. En lugar de cubrir todo el consumo doméstico, la batería retiene energía y solo descarga para compensar la parte del consumo que supera el límite de pico — manteniendo capacidad en reserva para cuando realmente se necesita.
 

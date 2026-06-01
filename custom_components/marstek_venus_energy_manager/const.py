@@ -1053,6 +1053,18 @@ BINARY_SENSOR_DEFINITIONS_V3 = [
         "enabled_by_default": False,
         "scan_interval": "low",
     },
+    {
+        "name": "Balancing Mode",
+        "register": 34009,
+        "data_type": "uint16",
+        "unit": None,
+        "category": "diagnostic",
+        "device_class": "running",
+        "icon": "mdi:scale-balance",
+        "key": "balancing_mode",
+        "enabled_by_default": True,
+        "scan_interval": "low",
+    },
 ]
 
 SELECT_DEFINITIONS_V3 = [

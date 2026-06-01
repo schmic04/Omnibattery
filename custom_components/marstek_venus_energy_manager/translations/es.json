@@ -1104,6 +1104,9 @@
       "battery_cycle_count": {
         "name": "Ciclos de la Batería"
       },
+      "balancing_mode": {
+        "name": "Modo de Balanceo"
+      },
       "battery_cycle_count_calc": {
         "name": "Ciclos de la Batería (Calculado)"
       },

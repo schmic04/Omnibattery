@@ -349,7 +349,8 @@ class MarstekModbusClient:
                         for reg in regs:
                             byte_array.append((reg >> 8) & 0xFF)
                             byte_array.append(reg & 0xFF)
-                        return byte_array.decode("ascii", errors="ignore").rstrip('\x00')
+                        text = byte_array.decode("ascii", errors="ignore").rstrip('\x00')
+                        return "".join(char for char in text if char.isprintable())
 
                     elif data_type == "bit":
                         if bit_index is None or not (0 <= bit_index < 16):

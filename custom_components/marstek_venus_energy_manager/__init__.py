@@ -330,6 +330,15 @@ class ChargeDischargeController:
         self.derivative_tau = 3.0       # seconds; larger = smoother but more lag
         self.derivative_filtered = 0.0  # filtered derivative state
 
+        # Control-quality metrics surfaced via the system_pd_control_quality sensor
+        # so the user can see the effect of the PD profile/sliders. Time-constant
+        # EMAs (alpha = dt/(tau+dt)) keep the averaging window constant under the
+        # variable event-driven cadence, like the rest of the loop.
+        self._pd_quality_tau = 60.0      # seconds; metric averaging window
+        self._pd_quality_rms_ema = None  # EMA of error^2 (W^2); sqrt -> RMS error
+        self._pd_quality_osc_ema = 0.0   # EMA of error-sign changes per minute
+        self._pd_quality_last_ts = None  # monotonic ts of last metric update
+
         # Measured-power anti-windup (back-calculation): re-anchor the incremental
         # base to the battery's real AC output when commanded power is not being
         # delivered (saturation/ramp lag not captured by the capacity clamp).
@@ -1269,6 +1278,45 @@ class ChargeDischargeController:
             self.enable_system_power_limits,
             self.system_max_charge_power, self.system_max_discharge_power,
         )
+
+    def _update_pd_quality_metrics(self, error: float, sign_changed: bool) -> None:
+        """Update control-quality EMAs (grid-error RMS and oscillation rate).
+
+        Called once per active PD cycle (skipped when the controller is paused by
+        restrictions). Uses real monotonic elapsed time so the averaging window is
+        constant under the variable event-driven cadence.
+        """
+        now = time.monotonic()
+        if self._pd_quality_last_ts is None:
+            self._pd_quality_last_ts = now
+            self._pd_quality_rms_ema = error * error
+            return
+        dt = now - self._pd_quality_last_ts
+        self._pd_quality_last_ts = now
+        if dt <= 0:
+            return
+        alpha = dt / (self._pd_quality_tau + dt)
+        sq = error * error
+        if self._pd_quality_rms_ema is None:
+            self._pd_quality_rms_ema = sq
+        else:
+            self._pd_quality_rms_ema += alpha * (sq - self._pd_quality_rms_ema)
+        # Oscillation rate in events/min: the instantaneous rate for this gap is
+        # (60/dt) when a sign change occurred this cycle, 0 otherwise; smoothed.
+        inst_per_min = (60.0 / dt) if sign_changed else 0.0
+        self._pd_quality_osc_ema += alpha * (inst_per_min - self._pd_quality_osc_ema)
+
+    @property
+    def pd_quality_rms_error(self) -> float | None:
+        """RMS of the grid-control error over the metric window (W), or None."""
+        if self._pd_quality_rms_ema is None:
+            return None
+        return math.sqrt(max(0.0, self._pd_quality_rms_ema))
+
+    @property
+    def pd_quality_oscillation_per_min(self) -> float:
+        """Smoothed error-sign-change rate (events/min); a hunting indicator."""
+        return self._pd_quality_osc_ema
 
     def _make_block_record(self, registry: dict, source: str, reason: str, details: dict | None) -> dict:
         """Build a blocker record, preserving the original activation time."""
@@ -6448,16 +6496,18 @@ class ChargeDischargeController:
             # - Inside deadband: System is stable, fluctuations are acceptable
             # - Outside deadband: Controller is active, sign changes indicate instability
             error_outside_deadband = abs(error) > self.deadband
-            
+            sign_changed = False  # captured for the control-quality oscillation metric
+
             if error_outside_deadband:
                 # Error is outside deadband - controller is actively trying to correct
                 current_error_sign = 1 if error > 0 else (-1 if error < 0 else 0)
-                
+
                 # Only count sign changes when BOTH current and previous errors were outside deadband
                 if current_error_sign != 0 and self.last_error_sign != 0:
                     if current_error_sign != self.last_error_sign:
                         # Sign changed while outside deadband - potential oscillation
                         self.sign_changes += 1
+                        sign_changed = True
                         
                         # If too many consecutive sign changes, reset PID to stabilize
                         if self.sign_changes >= self.oscillation_threshold:
@@ -6485,6 +6535,7 @@ class ChargeDischargeController:
                     self.sign_changes = 0
                 # Note: last_error_sign is NOT updated when inside deadband
                 # This ensures we only track sign changes that matter (outside deadband)
+            self._update_pd_quality_metrics(error, sign_changed)
             self.previous_error = error
             self.last_output_sign = current_output_sign
             if DEBUG_CONTROL_LOOP_DETAIL:

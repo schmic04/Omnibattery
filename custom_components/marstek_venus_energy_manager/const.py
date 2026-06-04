@@ -2035,6 +2035,71 @@ DEFAULT_SYSTEM_MAX_DISCHARGE_POWER = 0    # 0 = disabled
 # Legacy alias so existing __init__.py imports don't break during transition
 DEFAULT_SLOT_TARGET_GRID_POWER = DEFAULT_TARGET_GRID_POWER
 
+# PD Tuning Profiles
+# One-click presets for the four user-facing PD parameters (Kp, Kd, deadband,
+# max power change). Selecting a profile writes all four at once; the "custom"
+# profile leaves the sliders to the user for manual fine-tuning. Profiles are
+# ordered smoothest → fastest. "balanced" equals the shipping defaults, so an
+# untouched install maps onto it automatically.
+CONF_PD_TUNING_PROFILE = "pd_tuning_profile"
+PD_PROFILE_CUSTOM = "custom"
+DEFAULT_PD_TUNING_PROFILE = PD_PROFILE_CUSTOM
+
+PD_TUNING_PROFILES = {
+    "very_smooth": {
+        CONF_PD_KP: 0.30,
+        CONF_PD_KD: 0.15,
+        CONF_PD_DEADBAND: 100,
+        CONF_PD_MAX_POWER_CHANGE: 400,
+    },
+    "smooth": {
+        CONF_PD_KP: 0.45,
+        CONF_PD_KD: 0.25,
+        CONF_PD_DEADBAND: 70,
+        CONF_PD_MAX_POWER_CHANGE: 600,
+    },
+    "balanced": {
+        CONF_PD_KP: DEFAULT_PD_KP,
+        CONF_PD_KD: DEFAULT_PD_KD,
+        CONF_PD_DEADBAND: DEFAULT_PD_DEADBAND,
+        CONF_PD_MAX_POWER_CHANGE: DEFAULT_PD_MAX_POWER_CHANGE,
+    },
+    "aggressive": {
+        CONF_PD_KP: 1.00,
+        CONF_PD_KD: 0.65,
+        CONF_PD_DEADBAND: 25,
+        CONF_PD_MAX_POWER_CHANGE: 1200,
+    },
+}
+
+# Option order shown in the select (custom last); 5 total incl. manual.
+PD_TUNING_PROFILE_OPTIONS = list(PD_TUNING_PROFILES.keys()) + [PD_PROFILE_CUSTOM]
+
+# Effective value of each PD param when absent from config_entry.data.
+_PD_PROFILE_PARAM_DEFAULTS = {
+    CONF_PD_KP: DEFAULT_PD_KP,
+    CONF_PD_KD: DEFAULT_PD_KD,
+    CONF_PD_DEADBAND: DEFAULT_PD_DEADBAND,
+    CONF_PD_MAX_POWER_CHANGE: DEFAULT_PD_MAX_POWER_CHANGE,
+}
+
+
+def pd_profile_from_params(data) -> str:
+    """Return the preset name whose values match the four PD params in `data`.
+
+    Falls back to PD_PROFILE_CUSTOM when no preset matches (i.e. the user has
+    hand-tuned the sliders). Compared with a small epsilon to tolerate float
+    representation of Kp/Kd.
+    """
+    for name, params in PD_TUNING_PROFILES.items():
+        if all(
+            abs(float(data.get(key, _PD_PROFILE_PARAM_DEFAULTS[key])) - float(value)) < 1e-6
+            for key, value in params.items()
+        ):
+            return name
+    return PD_PROFILE_CUSTOM
+
+
 # Dynamic Pricing Mode Configuration
 CONF_PREDICTIVE_CHARGING_MODE = "predictive_charging_mode"
 CONF_PRICE_SENSOR = "price_sensor"

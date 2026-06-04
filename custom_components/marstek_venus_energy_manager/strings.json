@@ -903,6 +903,9 @@
       "system_daily_home_energy": {
         "name": "Daily Home Consumption"
       },
+      "system_pd_control_quality": {
+        "name": "PD Control Quality"
+      },
       "system_home_consumption": {
         "name": "Home Consumption"
       },
@@ -1185,6 +1188,16 @@
           "friday": "Friday",
           "saturday": "Saturday",
           "sunday": "Sunday"
+        }
+      },
+      "pd_tuning_profile": {
+        "name": "PD Tuning Profile",
+        "state": {
+          "very_smooth": "Very Smooth",
+          "smooth": "Smooth",
+          "balanced": "Balanced",
+          "aggressive": "Aggressive",
+          "custom": "Custom"
         }
       }
     },

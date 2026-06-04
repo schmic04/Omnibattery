@@ -11,7 +11,7 @@ import logging
 
 _LOGGER = logging.getLogger(__name__)
 
-from .const import DOMAIN, ALARM_BIT_DESCRIPTIONS, FAULT_BIT_DESCRIPTIONS, DEBUG_POLL_SENSOR_VALUES, CONF_HOUSEHOLD_CONSUMPTION_SENSOR, CONF_SOLAR_PRODUCTION_SENSOR
+from .const import DOMAIN, ALARM_BIT_DESCRIPTIONS, FAULT_BIT_DESCRIPTIONS, DEBUG_POLL_SENSOR_VALUES, CONF_HOUSEHOLD_CONSUMPTION_SENSOR, CONF_SOLAR_PRODUCTION_SENSOR, pd_profile_from_params
 from .coordinator import MarstekVenusDataUpdateCoordinator
 
 
@@ -121,6 +121,80 @@ class DailyGridAtMinSocSensor(SensorEntity):
     def native_value(self) -> float:
         """Return accumulated daily grid import at min SOC."""
         return round(self._controller._daily_grid_at_min_soc_kwh, 2)
+
+    @property
+    def device_info(self):
+        """Return device information for the system."""
+        return {
+            "identifiers": {(DOMAIN, "marstek_venus_system")},
+            "name": "Marstek Venus System",
+            "manufacturer": "Marstek",
+            "model": "Venus Multi-Battery System",
+        }
+
+
+class PdControlQualitySensor(SensorEntity):
+    """Diagnostic sensor exposing PD control-loop quality so users can see the
+    effect of the tuning profile / sliders.
+
+    State = RMS of the grid-control error (W); lower means tighter regulation.
+    Attributes carry the oscillation rate, the active parameters/profile, and a
+    `recommendation` key (localized by the dashboard) that closes the tuning loop.
+    """
+
+    # Thresholds for the recommendation. Oscillation is the dominant symptom of
+    # over-aggressive tuning (hunting); a high RMS with low oscillation is the
+    # signature of sluggish tuning that never catches up.
+    _OSC_HIGH_PER_MIN = 4.0
+    _RMS_HIGH_W = 150.0
+    _OSC_LOW_PER_MIN = 1.0
+
+    def __init__(self, controller) -> None:
+        """Initialize the sensor."""
+        self._controller = controller
+
+        self._attr_has_entity_name = True
+        self._attr_unique_id = "marstek_venus_system_pd_control_quality"
+        self._attr_translation_key = "system_pd_control_quality"
+        self._attr_native_unit_of_measurement = "W"
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        self._attr_icon = "mdi:tune-vertical"
+        self._attr_suggested_display_precision = 0
+        self._attr_should_poll = True  # metrics live on the controller; poll to refresh
+
+    @property
+    def native_value(self):
+        """Return the grid-error RMS (W), or None until metrics warm up."""
+        rms = self._controller.pd_quality_rms_error
+        return round(rms) if rms is not None else None
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Expose oscillation rate, active params/profile, and a tuning hint."""
+        c = self._controller
+        rms = c.pd_quality_rms_error
+        osc = round(c.pd_quality_oscillation_per_min, 2)
+        return {
+            "oscillation_per_min": osc,
+            "kp": c.kp,
+            "kd": c.kd,
+            "deadband_w": c.deadband,
+            "max_power_change_w": c.max_power_change_per_cycle,
+            "active_profile": pd_profile_from_params(c.config_entry.data),
+            "recommendation": self._recommendation(rms, osc),
+        }
+
+    @classmethod
+    def _recommendation(cls, rms: float | None, osc: float) -> str:
+        """Derive a tuning recommendation key from the live metrics."""
+        if rms is None:
+            return "collecting_data"
+        if osc >= cls._OSC_HIGH_PER_MIN:
+            return "oscillating"  # hunting: smoother profile / higher deadband
+        if rms > cls._RMS_HIGH_W and osc < cls._OSC_LOW_PER_MIN:
+            return "sluggish"     # too slow: more aggressive profile
+        return "stable"
 
     @property
     def device_info(self):

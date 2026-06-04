@@ -922,6 +922,9 @@
       "system_daily_home_energy": {
         "name": "Consum Diari de la Casa"
       },
+      "system_pd_control_quality": {
+        "name": "Qualitat de Control PD"
+      },
       "system_home_consumption": {
         "name": "Consum de la Casa"
       },
@@ -1204,6 +1207,16 @@
           "friday": "Divendres",
           "saturday": "Dissabte",
           "sunday": "Diumenge"
+        }
+      },
+      "pd_tuning_profile": {
+        "name": "Perfil d'Ajust PD",
+        "state": {
+          "very_smooth": "Molt Suau",
+          "smooth": "Suau",
+          "balanced": "Equilibrat",
+          "aggressive": "Agressiu",
+          "custom": "Personalitzat"
         }
       }
     },

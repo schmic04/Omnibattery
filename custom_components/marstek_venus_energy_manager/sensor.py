@@ -91,7 +91,7 @@ from .const import (
     DEFAULT_SLOT_ALLOW_DISCHARGE,
 )
 from .coordinator import MarstekVenusDataUpdateCoordinator
-from .aggregate_sensors import AGGREGATE_SENSOR_DEFINITIONS, MarstekVenusAggregateSensor, DailyGridAtMinSocSensor, SystemAlarmSensor
+from .aggregate_sensors import AGGREGATE_SENSOR_DEFINITIONS, MarstekVenusAggregateSensor, DailyGridAtMinSocSensor, SystemAlarmSensor, PdControlQualitySensor
 from .calculated_sensors import MarstekVenusEfficiencySensor, MarstekVenusStoredEnergySensor, MarstekVenusCycleSensor, MarstekVenusSolarPowerSensor, MarstekVenusBatteryCellPowerSensor
 
 _LOGGER = logging.getLogger(__name__)
@@ -184,6 +184,10 @@ async def async_setup_entry(
     # Add daily grid-at-min-soc energy sensor (feeds into consumption estimation)
     if controller:
         entities.append(DailyGridAtMinSocSensor(controller))
+
+    # Add PD control-quality diagnostic sensor (feeds the tuning-profile feedback)
+    if controller:
+        entities.append(PdControlQualitySensor(controller))
 
     # Exact daily energy totals from the real power sensors (panel "Energía hoy").
     # Each is added only when its source sensor is configured.

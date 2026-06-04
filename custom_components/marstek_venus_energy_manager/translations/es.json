@@ -925,6 +925,9 @@
       "system_home_consumption": {
         "name": "Consumo de la Casa"
       },
+      "system_pd_control_quality": {
+        "name": "Calidad de Control PD"
+      },
       "system_daily_grid_import_energy": {
         "name": "Importación Diaria de Red"
       },
@@ -1204,6 +1207,16 @@
           "friday": "Viernes",
           "saturday": "Sábado",
           "sunday": "Domingo"
+        }
+      },
+      "pd_tuning_profile": {
+        "name": "Perfil de Ajuste PD",
+        "state": {
+          "very_smooth": "Muy Suave",
+          "smooth": "Suave",
+          "balanced": "Equilibrado",
+          "aggressive": "Agresivo",
+          "custom": "Personalizado"
         }
       }
     },

@@ -13,6 +13,9 @@ Charges batteries to **100% once a week** so the pack reaches the LFP top-balanc
 
 The weekly full charge uses the same voltage profile as a normal battery configured with `max_soc = 100`. The weekly feature only raises the target to 100%; it does not use a separate balancing algorithm.
 
+!!! note "Drifted SOC"
+    If a pack reaches 3.58 V while the BMS still reports SOC below 90%, charging is *not* paused at step 4: the integration keeps charging at 95 W until the BMS cuts off, *attempting* to make it recalibrate SOC to 100% so the weekly charge can complete. This is best-effort and depends on the BMS firmware — it is not guaranteed. See [SOC recalibration on a stuck top voltage](cell-balance-monitor.md#soc-recalibration-on-a-stuck-top-voltage).
+
 ## Cell balance monitor
 
 The **cell balance monitor** is always active. It records the voltage spread between the highest and lowest cell after each top-voltage measurement and keeps the sensor history, trend and alerts updated.

@@ -116,6 +116,10 @@ from .const import (
     NORMAL_BALANCE_PAUSE_CELL_VOLTAGE,
     NORMAL_BALANCE_CHARGE_POWER_W,
     NORMAL_BALANCE_MEASURE_WAIT_SECONDS,
+    NORMAL_BALANCE_RECAL_SOC_THRESHOLD,
+    NORMAL_BALANCE_RECAL_CUTOFF_POWER_W,
+    NORMAL_BALANCE_RECAL_CUTOFF_CYCLES,
+    NORMAL_BALANCE_RECAL_INVERTER_STANDBY,
     CONF_ACTIVE_BALANCE_MODE_ENABLED,
     CONF_FULL_CHARGE_VOLTAGE_TAPER_ENABLED,
     DEFAULT_FULL_CHARGE_VOLTAGE_TAPER_ENABLED,
@@ -390,6 +394,11 @@ class ChargeDischargeController:
         self._normal_balance_measure_started: dict[MarstekVenusDataUpdateCoordinator, datetime] = {}
         self._normal_balance_last_delta_v: dict[MarstekVenusDataUpdateCoordinator, float] = {}
         self._normal_balance_top_voltage_seen: dict[MarstekVenusDataUpdateCoordinator, bool] = {}
+        # SOC recalibration override: keep charging past the tapper pause when the
+        # BMS reports a low SOC at the top voltage, until the BMS itself cuts off.
+        self._normal_balance_recal_override: dict[MarstekVenusDataUpdateCoordinator, bool] = {}
+        self._normal_balance_recal_cutoff_count: dict[MarstekVenusDataUpdateCoordinator, int] = {}
+        self._normal_balance_recal_latched: dict[MarstekVenusDataUpdateCoordinator, bool] = {}
         self._active_balance_mgr = ActiveBalanceModeManager(hass, self)
         
         # Calculate dynamic anti-windup limits based on total system capacity
@@ -746,6 +755,9 @@ class ChargeDischargeController:
         self._normal_balance_measure_started.clear()
         self._normal_balance_last_delta_v.clear()
         self._normal_balance_top_voltage_seen.clear()
+        self._normal_balance_recal_override.clear()
+        self._normal_balance_recal_cutoff_count.clear()
+        self._normal_balance_recal_latched.clear()
         for coordinator in self.coordinators:
             self.remove_charge_block("normal_balance_pause", coordinator=coordinator)
 
@@ -810,6 +822,56 @@ class ChargeDischargeController:
             return False
         return False
 
+    def _compute_recal_override(self, coordinator, vmax_f: float, soc) -> bool:
+        """Decide whether to keep charging past the tapper pause to recalibrate SOC.
+
+        Called only when the max cell sits at the pause voltage. A low reported
+        SOC at full cell voltage means the BMS coulomb counter has drifted, so
+        keep charging (at the tapered power) until the BMS itself cuts off, then
+        latch off so the SOC can recalibrate to 100%. The latch clears when the
+        battery leaves the top zone (see _refresh_normal_balance_blocks).
+        """
+        if soc is None or soc >= NORMAL_BALANCE_RECAL_SOC_THRESHOLD:
+            self._normal_balance_recal_cutoff_count.pop(coordinator, None)
+            return False
+        if self._normal_balance_recal_latched.get(coordinator):
+            return False
+
+        data = coordinator.data or {}
+        power = data.get("battery_power")
+        inv = data.get("inverter_state")
+        try:
+            cutoff = (
+                power is not None
+                and inv is not None
+                and float(power) <= NORMAL_BALANCE_RECAL_CUTOFF_POWER_W
+                and int(inv) == NORMAL_BALANCE_RECAL_INVERTER_STANDBY
+            )
+        except (TypeError, ValueError):
+            cutoff = False
+
+        if cutoff:
+            count = self._normal_balance_recal_cutoff_count.get(coordinator, 0) + 1
+            self._normal_balance_recal_cutoff_count[coordinator] = count
+            if count >= NORMAL_BALANCE_RECAL_CUTOFF_CYCLES:
+                self._normal_balance_recal_latched[coordinator] = True
+                self._normal_balance_recal_cutoff_count.pop(coordinator, None)
+                _LOGGER.info(
+                    "%s: BMS cutoff during SOC recalibration at vmax=%.3f V, SOC=%s%% — "
+                    "holding; SOC should recalibrate to 100%%",
+                    coordinator.name, vmax_f, soc,
+                )
+                return False
+        else:
+            self._normal_balance_recal_cutoff_count.pop(coordinator, None)
+        return True
+
+    def _clear_recal_state(self, coordinator) -> None:
+        """Drop all SOC-recalibration state for a battery (session ended)."""
+        self._normal_balance_recal_override.pop(coordinator, None)
+        self._normal_balance_recal_cutoff_count.pop(coordinator, None)
+        self._normal_balance_recal_latched.pop(coordinator, None)
+
     def _refresh_normal_balance_blocks(self) -> None:
         """Update normal high-SOC charge protection blockers.
 
@@ -824,18 +886,23 @@ class ChargeDischargeController:
             if not self._full_charge_voltage_taper_applies(coordinator):
                 self._normal_balance_charge_paused.pop(coordinator, None)
                 self._normal_balance_voltage_tapered.pop(coordinator, None)
+                self._clear_recal_state(coordinator)
                 self.remove_charge_block("normal_balance_pause", coordinator=coordinator)
                 continue
 
             if not data:
                 self._normal_balance_charge_paused.pop(coordinator, None)
                 self._normal_balance_voltage_tapered.pop(coordinator, None)
+                self._normal_balance_recal_override.pop(coordinator, None)
                 self.remove_charge_block("normal_balance_pause", coordinator=coordinator)
                 continue
 
             in_zone = self._normal_balance_zone_active(coordinator)
             if not in_zone:
                 self._normal_balance_voltage_tapered.pop(coordinator, None)
+                # Battery has dropped out of the top zone: end any recal session so
+                # a later full charge can recalibrate again.
+                self._clear_recal_state(coordinator)
 
             vmax = data.get("max_cell_voltage")
             paused = False
@@ -853,6 +920,17 @@ class ChargeDischargeController:
                         self._normal_balance_top_voltage_seen[coordinator] = True
                     if vmax_f >= NORMAL_BALANCE_PAUSE_CELL_VOLTAGE:
                         paused = True
+
+            # SOC recalibration: if the pause would trigger but the BMS reports a
+            # low SOC at the top voltage, keep charging until the BMS cuts off.
+            override = False
+            if paused:
+                override = self._compute_recal_override(
+                    coordinator, vmax_f, data.get("battery_soc")
+                )
+                if override:
+                    paused = False
+            self._normal_balance_recal_override[coordinator] = override
 
             if paused:
                 self._normal_balance_charge_paused[coordinator] = True
@@ -890,6 +968,8 @@ class ChargeDischargeController:
                 "active_balance_phase": getattr(
                     self, "_normal_active_balance_phases", {}
                 ).get(coordinator),
+                "soc_recal_active": self._normal_balance_recal_override.get(coordinator, False),
+                "soc_recal_bms_cutoff": self._normal_balance_recal_latched.get(coordinator, False),
                 "charge_limit_w": self._battery_power_limit(coordinator, True),
             }
         return status
@@ -925,6 +1005,12 @@ class ChargeDischargeController:
             if coordinator.data is None or not self._full_charge_voltage_taper_applies(coordinator):
                 continue
             if self._is_active_balance_mode_running(coordinator):
+                continue
+            if self._normal_balance_recal_override.get(coordinator):
+                # SOC recalibration in progress: let PD keep charging to the BMS
+                # cutoff instead of holding/measuring at the top voltage.
+                self._normal_active_balance_phases.pop(coordinator, None)
+                self._normal_balance_measure_started.pop(coordinator, None)
                 continue
             if coordinator in self._normal_active_balance_phases:
                 active_coordinators.add(coordinator)
@@ -1787,6 +1873,17 @@ class ChargeDischargeController:
                 self.remove_charge_block("charge_hysteresis", coordinator=coordinator)
                 continue
 
+            if self._normal_balance_recal_override.get(coordinator):
+                # SOC recalibration: don't let top-voltage hysteresis stop the
+                # charge before the BMS cutoff.
+                if coordinator.enable_charge_hysteresis and coordinator._hysteresis_active:
+                    _LOGGER.debug("%s: Overriding hysteresis for SOC recalibration", coordinator.name)
+                coordinator._hysteresis_active = False
+                coordinator._hysteresis_base_soc = None
+                self.remove_charge_block("max_soc", coordinator=coordinator)
+                self.remove_charge_block("charge_hysteresis", coordinator=coordinator)
+                continue
+
             effective_max_soc, max_soc_source = self._effective_charge_max_soc(
                 coordinator,
                 weekly_100_unlocked,
@@ -2077,6 +2174,16 @@ class ChargeDischargeController:
                         if coordinator._hysteresis_active:
                             _LOGGER.debug(
                                 "%s: Overriding hysteresis for weekly full charge",
+                                coordinator.name,
+                            )
+                        coordinator._hysteresis_active = False
+                        coordinator._hysteresis_base_soc = None
+                    elif self._normal_balance_recal_override.get(coordinator):
+                        # SOC recalibration: bypass top-voltage hysteresis so the
+                        # charge continues to the BMS cutoff.
+                        if coordinator._hysteresis_active:
+                            _LOGGER.debug(
+                                "%s: Overriding hysteresis for SOC recalibration",
                                 coordinator.name,
                             )
                         coordinator._hysteresis_active = False

@@ -70,6 +70,32 @@ No hay histéresis adicional de voltaje en esta ruta. Cuando la batería llega a
 
 En sistemas con varias baterías, la lógica se evalúa por batería. Una batería puede estar limitada o pausada mientras otra sigue cargando con normalidad.
 
+### Recalibración de SOC con tensión alta atascada
+
+Algunos packs llegan al punto de pausa de 3.58 V mientras el BMS sigue reportando un SOC muy por debajo del total (por ejemplo 60–70 %). Esa diferencia indica que el contador de coulombs del BMS se ha desviado: las celdas están realmente llenas pero el SOC reportado es incorrecto.
+
+Cuando esto ocurre, quedarse en 3.58 V nunca deja que el BMS se corrija. Por eso, en vez de pausar, la integración sigue cargando a la potencia reducida de 95 W hasta que el propio BMS corta, *intentando* que recalibre el SOC al 100 %.
+
+Es un intento de mejor esfuerzo, no una solución garantizada. Que un corte en la parte alta de la curva realmente reinicie el SOC reportado depende del firmware del BMS: algunos packs saltan al 100 % con un corte por sobretensión, otros no. La integración solo crea las condiciones para una recalibración — no puede obligar al BMS a aplicarla.
+
+El override se activa automáticamente cuando se cumple **todo** lo siguiente:
+
+- el objetivo de carga es 100 % (la reducción aplica), y
+- `max_cell_voltage` ha alcanzado el punto de pausa de 3.58 V, y
+- el BMS sigue reportando un SOC por debajo del 90 %.
+
+Es autolimitado:
+
+- la carga continúa solo a 95 W (la potencia suave de reducción), no a plena potencia;
+- el corte del BMS se detecta cuando la potencia de la batería cae a ≤ 10 W y el inversor reporta Standby durante 5 ciclos consecutivos (~10 s). En ese momento el override se enclava y se reanuda la pausa normal de 3.58 V, dejando que el SOC se recalibre;
+- una vez que el SOC marca 90 % o más (tras recalibrar), la condición ya no se cumple, así que el override no se vuelve a disparar;
+- el enclavamiento solo se rearma cuando la batería sale de la zona alta (`max_cell_voltage` por debajo de 3.48 V), para que una carga completa posterior pueda recalibrar de nuevo si hace falta.
+
+Como depende de un objetivo de carga del 100 %, nunca afecta al ciclado diario normal con un `max_soc` más bajo. Tampoco se ejecuta mientras el [modo de balanceo activo](#modo-de-balanceo-activo) controla la batería — ese modo tiene prioridad.
+
+!!! note "Desbalance de celdas"
+    El override no comprueba primero la dispersión entre celdas. En un pack muy desbalanceado, la celda más alta puede llegar al corte por sobretensión del BMS antes de que el pack esté lleno, así que la recalibración es correcta pero el balanceo queda para ciclos posteriores. El BMS sigue protegiendo cada celda de forma individual.
+
 ## Modo de balanceo activo
 
 El modo de balanceo activo es una ruta de recuperación más fuerte para baterías que necesitan más tiempo en la ventana de balanceo.
@@ -189,6 +215,8 @@ El sensor **Integration Status** expone un atributo `normal_balance_protection` 
 | `delta_V` | Diferencia actual de tensión en voltios |
 | `voltage_taper_latched` | Si la reducción a 95 W está activa |
 | `active_balance_phase` | Fase actual de medición al 100 %, si existe |
+| `soc_recal_active` | Si la carga se mantiene más allá de la pausa de 3.58 V para recalibrar un SOC reportado bajo |
+| `soc_recal_bms_cutoff` | Si se ha alcanzado el corte del BMS durante la recalibración (override enclavado) |
 | `charge_limit_w` | Límite efectivo de carga por batería antes del reparto |
 
 El modo de balanceo activo también expone su fase actual, delta medido, potencia ordenada y voltaje de reintento en los diagnósticos del estado de integración.

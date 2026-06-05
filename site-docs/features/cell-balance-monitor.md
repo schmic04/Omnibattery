@@ -84,6 +84,32 @@ There is no extra voltage hysteresis in this path. Once the battery reaches 3.58
 
 In a multi-battery system, this is evaluated per battery. One battery can be limited or paused while another continues charging normally.
 
+### SOC recalibration on a stuck top voltage
+
+Some packs reach the 3.58 V pause point while the BMS still reports a SOC well below full (for example 60–70%). That gap is a sign the BMS coulomb counter has drifted: the cells are genuinely full but the reported SOC is wrong.
+
+When this happens, holding at 3.58 V never lets the BMS correct itself. So instead of pausing, the integration keeps charging at the 95 W tapered power until the BMS itself cuts off, *attempting* to make it recalibrate SOC to 100%.
+
+This is a best-effort attempt, not a guaranteed fix. Whether a top-of-curve cutoff actually resets the reported SOC depends on the BMS firmware: some packs snap to 100% on an over-voltage cutoff, others do not. The integration only creates the conditions for a recalibration — it cannot force the BMS to apply one.
+
+The override triggers automatically whenever **all** of these are true:
+
+- the charge target is 100% (the taper applies), and
+- `max_cell_voltage` has reached the 3.58 V pause point, and
+- the BMS still reports SOC below 90%.
+
+It is self-limiting:
+
+- charging continues at 95 W only (the gentle taper power), not full power;
+- a BMS cutoff is detected when battery power collapses to ≤ 10 W and the inverter reports Standby for 5 consecutive cycles (~10 s). At that point the override latches off and the normal 3.58 V pause resumes, letting the SOC recalibrate;
+- once the SOC reads 90% or more (after recalibration), the condition no longer matches, so the override does not fire again;
+- the latch only re-arms after the battery leaves the top zone (`max_cell_voltage` below 3.48 V), so a later full charge can recalibrate again if needed.
+
+Because this is gated on a 100% charge target, it never affects normal daily cycling at a lower `max_soc`. It also does not run while [active balance mode](#active-balance-mode) owns the battery — that mode takes priority.
+
+!!! note "Cell imbalance"
+    The override does not check the cell spread first. On a badly imbalanced pack the highest cell can hit the BMS over-voltage cutoff before the pack is full, so the recalibration is correct but balancing is left to later cycles. The BMS still protects each cell individually.
+
 ## Active balance mode
 
 Active balance mode is a stronger per-battery recovery mode for packs that need more time in the balancing window.
@@ -203,6 +229,8 @@ The **Integration Status** sensor exposes a `normal_balance_protection` attribut
 | `delta_V` | Current voltage spread in volts |
 | `voltage_taper_latched` | Whether the 95 W taper is currently active |
 | `active_balance_phase` | Current 100% top-measurement phase, if any |
+| `soc_recal_active` | Whether the charge is being kept past the 3.58 V pause to recalibrate a low reported SOC |
+| `soc_recal_bms_cutoff` | Whether the BMS cutoff has been reached during recalibration (override latched off) |
 | `charge_limit_w` | Effective per-battery charge limit before allocation |
 
 Active balance mode also exposes its current phase, measured delta, command power and retry voltage through the integration status diagnostics.

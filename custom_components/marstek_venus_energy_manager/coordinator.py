@@ -379,6 +379,16 @@ class MarstekVenusDataUpdateCoordinator(DataUpdateCoordinator):
                             if dep_key}
         # Cell voltage keys are always needed by the balance monitor
         dependency_keys_set.update({"max_cell_voltage", "min_cell_voltage"})
+        # Control registers must keep polling even when the user disables their
+        # number entities, otherwise the control loop loses its commanded power,
+        # power caps and SOC cutoffs from coordinator.data and stops driving the
+        # batteries.
+        dependency_keys_set.update({
+            "set_charge_power", "set_discharge_power",
+            "max_charge_power", "max_discharge_power",
+            "force_mode",
+            "charging_cutoff_capacity", "discharging_cutoff_capacity",
+        })
 
         # Set client unit ID for this battery
         self.client.unit_id = self.slave_id

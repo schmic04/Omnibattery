@@ -6733,8 +6733,11 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     v2 -> v3: expand time slots from {apply_to_charge} to per-direction tick schema.
     v3 -> v4: lower PD defaults (Kp 0.65->0.35, Kd 0.5->0.3) for installs still on
               the old defaults, to curb overshoot under the cadence-independent loop.
+    v4 -> v5: re-enable cell voltage sensors that the integration disabled before
+              they were switched to enabled_by_default. Only re-enables entities
+              disabled by the integration, leaving user-disabled ones untouched.
     """
-    if entry.version >= 4:
+    if entry.version >= 5:
         return True
 
     new_data = dict(entry.data)
@@ -6808,7 +6811,26 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 new_data.get(CONF_PD_KP), new_data.get(CONF_PD_KD),
             )
 
-    hass.config_entries.async_update_entry(entry, data=new_data, version=4)
+    if entry.version < 5:
+        from homeassistant.helpers import entity_registry as er
+
+        ent_reg = er.async_get(hass)
+        targets = ("_max_cell_voltage", "_min_cell_voltage")
+        count = 0
+        for ent in er.async_entries_for_config_entry(ent_reg, entry.entry_id):
+            if (
+                ent.disabled_by is er.RegistryEntryDisabler.INTEGRATION
+                and ent.unique_id.endswith(targets)
+            ):
+                ent_reg.async_update_entity(ent.entity_id, disabled_by=None)
+                count += 1
+        _LOGGER.info(
+            "Marstek: migrated config entry to version 5 "
+            "(re-enabled %d integration-disabled cell voltage sensor(s))",
+            count,
+        )
+
+    hass.config_entries.async_update_entry(entry, data=new_data, version=5)
     return True
 
 

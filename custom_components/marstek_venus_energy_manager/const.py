@@ -2082,8 +2082,8 @@ RELAY_COOLDOWN_HOLD_POWER = 100
 # publish several times per second; without a floor, each out-of-deadband cycle
 # issues a Modbus write burst, which slow TCP-serial bridges (e.g. Elfin EW11)
 # can choke on. Drops surplus sensor-triggered cycles; the 2 s safety timer is
-# never gated. 0 = disabled (default: pre-feature behaviour, opt-in via slider).
-DEFAULT_PD_MIN_CYCLE_INTERVAL = 0.0
+# never gated. 0 = disabled (pre-feature behaviour); default 1 s caps bursts.
+DEFAULT_PD_MIN_CYCLE_INTERVAL = 1.0
 DEFAULT_TARGET_GRID_POWER = 0
 DEFAULT_ENABLE_SYSTEM_POWER_LIMITS = False
 DEFAULT_SYSTEM_MAX_CHARGE_POWER = 0       # 0 = disabled

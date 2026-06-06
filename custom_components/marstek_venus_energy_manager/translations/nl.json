@@ -1276,6 +1276,9 @@
       "pd_relay_cooldown": {
         "name": "PD Relais-Wachttijd"
       },
+      "pd_min_cycle_interval": {
+        "name": "PD Min. Cyclusinterval"
+      },
       "pd_target_grid_power": {
         "name": "PD Doelnetvermogen"
       },

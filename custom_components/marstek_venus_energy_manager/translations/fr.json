@@ -1276,6 +1276,9 @@
       "pd_relay_cooldown": {
         "name": "PD Temporisation Relais"
       },
+      "pd_min_cycle_interval": {
+        "name": "PD Intervalle Min. de Cycle"
+      },
       "pd_target_grid_power": {
         "name": "PD Puissance Cible Réseau"
       },

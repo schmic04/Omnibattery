@@ -1,5 +1,10 @@
 # Changelog
 
+## [2.0.2] - 2026-06-09
+
+### Fixed
+- **Control-tab cards overflowed at ~1080p**: sliders collapsed to the knob and values/buttons spilled outside the card box on narrow screens. The settings blocks now wrap to multiple rows instead of crushing into one, and section labels can wrap. [`marstek-panel.js`](custom_components/marstek_venus_energy_manager/frontend/marstek-panel.js).
+
 ## [2.0.1] - 2026-06-08
 
 > **Upgrade notes** (no manual action required unless stated):

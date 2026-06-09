@@ -4206,9 +4206,12 @@ class MarstekVenusPanel extends HTMLElement {
          vertical stack (cards pack tight, no shared heights). .sys-pair is a
          2-col grid whose rows DO share a height (align-items: stretch), so the
          first two columns line up card-for-card row by row. */
-      .sys-stack { display: flex; gap: var(--gap); align-items: flex-start; }
-      .sys-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: var(--gap); }
-      .sys-pair { flex: 2 1 0; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); align-items: stretch; align-content: start; }
+      /* wrap blocks to new rows once cards would get too narrow (5 blocks in one
+         row crushes sliders/values at ~1080p); flex-basis sets each block's
+         minimum usable width before wrapping */
+      .sys-stack { display: flex; flex-wrap: wrap; gap: var(--gap); align-items: flex-start; }
+      .sys-col { flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: var(--gap); }
+      .sys-pair { flex: 2 1 620px; min-width: 0; display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); align-items: stretch; align-content: start; }
       .sys-pair > .card { height: 100%; }
       .sys-pair-spacer { min-width: 0; }
       .sys-stack > .placeholder { flex: 1 1 100%; }
@@ -4217,7 +4220,10 @@ class MarstekVenusPanel extends HTMLElement {
       .card-info { margin-left: auto; padding: 0; border: 0; background: none; cursor: pointer;
         color: var(--ink-dim); display: grid; place-items: center; --mdc-icon-size: 16px; }
       .card-info:hover { color: var(--ink); }
-      .sys-grid { margin-top: 14px; }
+      /* narrow paired-column cards: let the label track shrink (max-content can't)
+         and wrap, so sliders/buttons never overflow the card box at ~1080p */
+      .sys-grid { margin-top: 14px; grid-template-columns: minmax(0, max-content) minmax(0, 1fr); }
+      .sys-grid .ctl-k { white-space: normal; overflow-wrap: anywhere; }
       /* label with a tap/hover detail popover (e.g. time-slot details) */
       .ctl-k-info { cursor: pointer; }
       .ctl-k-info > span { text-decoration: underline dotted var(--ink-dim); text-underline-offset: 3px; }

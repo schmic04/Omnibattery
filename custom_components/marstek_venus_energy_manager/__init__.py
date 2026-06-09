@@ -23,6 +23,7 @@ from pymodbus.exceptions import ConnectionException
 
 from .const import (
     DOMAIN,
+    NOTIFICATION_ID_PREFIX,
     CONF_ENABLE_PREDICTIVE_CHARGING,
     CONF_CHARGING_TIME_SLOT,
     CONF_SOLAR_FORECAST_SENSOR,
@@ -5169,7 +5170,7 @@ class ChargeDischargeController:
             {
                 "title": title,
                 "message": message,
-                "notification_id": "predictive_charging_evaluation",
+                "notification_id": f"{NOTIFICATION_ID_PREFIX}predictive_charging_evaluation",
             },
         )
 
@@ -5203,7 +5204,7 @@ class ChargeDischargeController:
             {
                 "title": title,
                 "message": message,
-                "notification_id": "predictive_charging_evaluation",
+                "notification_id": f"{NOTIFICATION_ID_PREFIX}predictive_charging_evaluation",
             },
         )
 
@@ -5290,7 +5291,7 @@ class ChargeDischargeController:
             {
                 "title": title,
                 "message": message,
-                "notification_id": "predictive_charging_evaluation",
+                "notification_id": f"{NOTIFICATION_ID_PREFIX}predictive_charging_evaluation",
             },
         )
 
@@ -5493,7 +5494,7 @@ class ChargeDischargeController:
             {
                 "title": "Predictive Charging: Evening re-evaluation",
                 "message": message,
-                "notification_id": "predictive_charging_evening_reeval",
+                "notification_id": f"{NOTIFICATION_ID_PREFIX}predictive_charging_evening_reeval",
             },
         )
 
@@ -5809,7 +5810,7 @@ class ChargeDischargeController:
                 await self.hass.services.async_call(
                     "persistent_notification",
                     "dismiss",
-                    {"notification_id": "predictive_charging_evaluation"},
+                    {"notification_id": f"{NOTIFICATION_ID_PREFIX}predictive_charging_evaluation"},
                 )
 
             self._slot_entry_time = None
@@ -5837,7 +5838,7 @@ class ChargeDischargeController:
             {
                 "title": title,
                 "message": message,
-                "notification_id": "predictive_charging_evaluation",
+                "notification_id": f"{NOTIFICATION_ID_PREFIX}predictive_charging_evaluation",
             },
         )
     

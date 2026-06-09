@@ -2,6 +2,11 @@
 
 DOMAIN = "marstek_venus_energy_manager"
 
+# Prefix for every persistent_notification this integration creates/dismisses.
+# Lets automations (e.g. the Telegram-forwarding blueprint) reliably select only
+# our notifications by ID. All notification_id values MUST start with this.
+NOTIFICATION_ID_PREFIX = "marstek_venus_"
+
 # Internal debug switches for maintainer-level troubleshooting.
 # Keep these disabled for normal Home Assistant debug logging; enabling them can
 # generate very large logs on systems with fast polling or multiple batteries.

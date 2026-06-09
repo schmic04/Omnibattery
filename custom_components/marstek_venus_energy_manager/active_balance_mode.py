@@ -35,6 +35,7 @@ from .const import (
     ACTIVE_BALANCE_MEASURE_WAIT_SECONDS,
     ACTIVE_BALANCE_MODE_TARGET_DELTA_V,
     CONF_ACTIVE_BALANCE_MODE_ENABLED,
+    NOTIFICATION_ID_PREFIX,
 )
 
 if TYPE_CHECKING:
@@ -319,7 +320,7 @@ class ActiveBalanceModeManager:
             parts.append(started_ts)
         if reason:
             parts.append(reason)
-        return "_".join(_sanitize(part) for part in parts)
+        return NOTIFICATION_ID_PREFIX + "_".join(_sanitize(part) for part in parts)
 
     async def _dismiss_persistent_notification(self, notification_id: str) -> None:
         """Dismiss a persistent notification if it exists."""

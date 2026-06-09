@@ -2,7 +2,11 @@
 
 ## [2.0.2] - 2026-06-09
 
+### Added
+- **Telegram notification blueprint**: forwards Home Assistant persistent notifications to a Telegram chat, filtered by default to only this integration's notifications. Thanks to Adrià for the original automation. [`persistent_notification_to_telegram_blueprint.yaml`](blueprints/persistent_notification_to_telegram_blueprint.yaml).
+
 ### Changed
+- **Persistent notification IDs namespaced** with a `marstek_venus_` prefix so automations can reliably target only this integration's notifications (the blueprint above filters on it). Note: breaks automations referencing the old IDs. [`const.py`](custom_components/marstek_venus_energy_manager/const.py).
 - **Venus D charge/discharge limit raised to 2500 W** (was 2200): firmware 149 supports the higher rating. The power sliders, setup/options flow, and dashboard panel now allow up to 2500 W. Existing Venus D configs keep their saved value — re-set the slider to use the new ceiling. [`const.py`](custom_components/marstek_venus_energy_manager/const.py).
 
 ### Fixed

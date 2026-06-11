@@ -10,9 +10,12 @@ lightweight state stand-ins. Both methods only read ``config_entry.data`` and
 """
 from __future__ import annotations
 
+from datetime import timedelta
 from types import SimpleNamespace
 
 import pytest
+
+from homeassistant.util import dt as dt_util
 
 from custom_components.marstek_venus_energy_manager.external_loads import ExternalLoads
 
@@ -162,3 +165,73 @@ def test_adjustment_solar_surplus_while_discharging_full_exclusion():
 def test_adjustment_skips_unusable_devices(device):
     loads = _controller([device], {"sensor.dev": _state(500)})
     assert loads.calculate_adjustment(0.0) == 0.0
+
+
+# ----------------------------------------------------------------------
+# check_ev_charger_state  (no-telemetry EV: 5-min pause then discharge-block)
+# Time-dependent: a frozen clock drives the pause window. Returns
+# (pause_active, ev_charging_active).
+# ----------------------------------------------------------------------
+
+def _ev_device(**overrides):
+    """A no-telemetry EV charger: a state sensor, not a numeric power sensor."""
+    base = {
+        "enabled": True,
+        "ev_charger_no_telemetry": True,
+        "power_sensor": "sensor.ev",
+    }
+    base.update(overrides)
+    return base
+
+
+def test_ev_start_charging_starts_pause():
+    loads = _controller([_ev_device()], {"sensor.ev": _state("charging")})
+    # First detection: pause begins, not yet discharge-blocking.
+    assert loads.check_ev_charger_state() == (True, False)
+
+
+def test_ev_pause_stays_active_within_5_min():
+    loads = _controller([_ev_device()], {"sensor.ev": _state("charging")})
+    loads.check_ev_charger_state()                # pause starts (now + 5 min)
+    # An immediate re-check is well within the 5-minute window.
+    assert loads.check_ev_charger_state() == (True, False)
+
+
+def test_ev_charging_active_after_pause_expires():
+    loads = _controller([_ev_device()], {"sensor.ev": _state("charging")})
+    loads.check_ev_charger_state()                # pause starts
+    # Simulate the 5-min pause having elapsed by moving the stored deadline into
+    # the past. (freezegun can't patch HA's dt_util.utcnow with the HA pytest
+    # plugin disabled, so we manipulate the deadline directly instead.)
+    loads._controller._ev_pause_until["sensor.ev"] = dt_util.utcnow() - timedelta(minutes=1)
+    assert loads.check_ev_charger_state() == (False, True)
+
+
+def test_ev_stop_charging_cancels_pause():
+    states = {"sensor.ev": _state("charging")}
+    loads = _controller([_ev_device()], states)
+    loads.check_ev_charger_state()                # pause starts
+    states["sensor.ev"] = _state("idle")          # EV stops mid-pause
+    assert loads.check_ev_charger_state() == (False, False)
+    assert loads._controller._ev_pause_until == {}
+
+
+def test_ev_idle_does_nothing():
+    loads = _controller([_ev_device()], {"sensor.ev": _state("idle")})
+    assert loads.check_ev_charger_state() == (False, False)
+
+
+def test_ev_spanish_cargando_detected():
+    loads = _controller([_ev_device()], {"sensor.ev": _state("Cargando")})
+    assert loads.check_ev_charger_state() == (True, False)
+
+
+@pytest.mark.parametrize("device", [
+    _ev_device(enabled=False),
+    _ev_device(power_sensor=None),
+    # A numeric excluded device (not a no-telemetry EV) must be ignored here.
+    _device(ev_charger_no_telemetry=False, power_sensor="sensor.ev"),
+])
+def test_ev_skips_non_applicable_devices(device):
+    loads = _controller([device], {"sensor.ev": _state("charging")})
+    assert loads.check_ev_charger_state() == (False, False)

@@ -492,6 +492,8 @@ class ChargeDischargeController:
 
         # Price-based discharge control flag (set each cycle by pricing handlers, consumed by PD section)
         self._price_based_discharge_blocked: bool = False
+        # Solar surplus excluded device flag (set each cycle by calculate_adjustment, consumed by PD section)
+        self._solar_surplus_discharge_blocked: bool = False
         self._global_charge_blockers: dict[str, dict] = {}
         self._global_discharge_blockers: dict[str, dict] = {}
         self._battery_charge_blockers: dict[MarstekVenusDataUpdateCoordinator, dict[str, dict]] = {}
@@ -5734,7 +5736,7 @@ class ChargeDischargeController:
         # Adjust for excluded/additional devices before dynamic setpoint decisions.
         # Positive adjustment = reduce battery discharge (excluded devices)
         # Negative adjustment = increase battery discharge (additional devices not in home sensor)
-        excluded_adjustment = self._external_loads.calculate_adjustment(sensor_actual)
+        excluded_adjustment = self._external_loads.calculate_adjustment()
         if excluded_adjustment != 0:
             if excluded_adjustment > 0:
                 _LOGGER.info("Reducing battery demand by %.1fW (excluded devices)", excluded_adjustment)
@@ -5775,7 +5777,9 @@ class ChargeDischargeController:
 
         # CRITICAL: Check deadband on FILTERED sensor (actual grid balance) BEFORE compensation
         # Deadband is centered around the active target grid power
-        if not blocked_active_changed and abs(sensor_filtered - active_target) < self.deadband:
+        # Skip on first_execution: controller hasn't initialized yet; returning here keeps
+        # first_execution=True forever when the grid happens to be balanced at startup.
+        if not self.first_execution and not blocked_active_changed and abs(sensor_filtered - active_target) < self.deadband:
             if DEBUG_CONTROL_LOOP_DETAIL:
                 _LOGGER.debug(
                     "ChargeDischargeController: Filtered sensor %.1fW within deadband of target %dW (+/-%dW), no action.",
@@ -6219,6 +6223,17 @@ class ChargeDischargeController:
                 new_power = 0
                 self._active_discharge_batteries = []
                 operation_restricted = True
+
+        # Solar surplus excluded device active: battery may charge but must not discharge.
+        # Discharge would cause oscillation because the device adjustment flips sign with
+        # previous_power — there is no stable fixed point when device_power > solar_surplus.
+        if not operation_restricted and self._solar_surplus_discharge_blocked and new_power < 0:
+            _LOGGER.info(
+                "ChargeDischargeController: Solar surplus excluded device active – blocking battery discharge"
+            )
+            new_power = 0
+            self._active_discharge_batteries = []
+            operation_restricted = True
 
         # Get available batteries (after checking restrictions to determine correct operation mode)
         available_batteries = self._get_available_batteries(is_charging)

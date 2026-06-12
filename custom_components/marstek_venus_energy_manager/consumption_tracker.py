@@ -286,16 +286,46 @@ class ConsumptionTracker:
         unit = state.attributes.get("unit_of_measurement", "W")
         return value if unit == "kW" else value / 1000.0
 
-    async def accumulate_daily_solar_energy(self) -> None:
-        """Integrate the real solar production power sensor → exact daily kWh.
+    def _read_total_solar_power_kw(self) -> Optional[float]:
+        """Total instantaneous solar production (kW): external sensor + Venus PV.
 
+        Sums the configured external solar_production_sensor (e.g. an APS/ECU
+        feed) and the DC-coupled PV on every Venus vA/vD unit (its MPPT inputs),
+        so a battery with panels on its own MPPT ports is counted even when no
+        external sensor is configured. Returns None only when no source has a
+        usable reading.
+        """
+        ctrl = self._controller
+        total_kw = 0.0
+        have_reading = False
+        if ctrl.solar_production_sensor:
+            ext_kw = self._read_power_kw(ctrl.solar_production_sensor)
+            if ext_kw is not None:
+                total_kw += max(0.0, ext_kw)
+                have_reading = True
+        for coordinator in ctrl.coordinators:
+            if coordinator.battery_version not in ("vA", "vD") or not coordinator.data:
+                continue
+            mppt_w = 0.0
+            seen = False
+            for key in ("mppt1_power", "mppt2_power", "mppt3_power", "mppt4_power"):
+                value = coordinator.data.get(key)
+                if value is not None:
+                    mppt_w += value
+                    seen = True
+            if seen:
+                total_kw += max(0.0, mppt_w) / 1000.0
+                have_reading = True
+        return total_kw if have_reading else None
+
+    async def accumulate_daily_solar_energy(self) -> None:
+        """Integrate total solar production power → exact daily kWh.
+
+        Total = external solar sensor + Venus DC-coupled PV (MPPT on vA/vD).
         Trapezoidal rule: averages the previous and current sample so a ramping
         production curve is not systematically miscounted (left-Riemann bias).
         """
-        ctrl = self._controller
-        if not ctrl.solar_production_sensor:
-            return
-        power_kw = self._read_power_kw(ctrl.solar_production_sensor)
+        power_kw = self._read_total_solar_power_kw()
         if power_kw is None:
             self._daily_solar_last_time = None
             self._daily_solar_last_power_kw = None
@@ -306,7 +336,7 @@ class ConsumptionTracker:
             dt_hours = (now - self._daily_solar_last_time) / 3600.0
             if dt_hours > 0:
                 avg_kw = (self._daily_solar_last_power_kw + power_kw) / 2.0
-                ctrl._daily_solar_energy_kwh += avg_kw * dt_hours
+                self._controller._daily_solar_energy_kwh += avg_kw * dt_hours
         self._daily_solar_last_time = now
         self._daily_solar_last_power_kw = power_kw
 

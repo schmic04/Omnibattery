@@ -94,3 +94,65 @@ def test_avg_daily_consumption_averages_history():
 def test_avg_daily_consumption_single_day():
     tracker = _make_tracker([(date(2026, 6, 1), 3.0)])
     assert tracker.get_avg_daily_consumption() == pytest.approx(3.0)
+
+
+# ----------------------------------------------------------------------
+# Total solar power: external sensor + Venus DC-coupled PV (MPPT on vA/vD).
+# Pins the #354 fix — daily solar must count the battery's own MPPT panels,
+# not only the configured external sensor, and survive the external being gone.
+# ----------------------------------------------------------------------
+
+class _FakeStates:
+    def __init__(self, mapping):
+        self._mapping = mapping
+
+    def get(self, entity_id):
+        return self._mapping.get(entity_id)
+
+
+def _w(value):
+    """A power state in watts."""
+    return SimpleNamespace(state=str(value), attributes={"unit_of_measurement": "W"})
+
+
+def _make_solar_tracker(states, solar_sensor, coordinators):
+    tracker = ConsumptionTracker.__new__(ConsumptionTracker)
+    tracker._hass = SimpleNamespace(states=_FakeStates(states))
+    tracker._controller = SimpleNamespace(
+        solar_production_sensor=solar_sensor,
+        coordinators=coordinators,
+    )
+    return tracker
+
+
+def _vunit(version, mppt_total):
+    return SimpleNamespace(battery_version=version, data={"mppt1_power": mppt_total})
+
+
+def test_total_solar_external_only():
+    tracker = _make_solar_tracker({"sensor.aps": _w(1500)}, "sensor.aps", [])
+    assert tracker._read_total_solar_power_kw() == pytest.approx(1.5)
+
+
+def test_total_solar_mppt_only_no_external():
+    # No external sensor configured, panels on the Venus MPPT inputs.
+    tracker = _make_solar_tracker({}, None, [_vunit("vA", 800)])
+    assert tracker._read_total_solar_power_kw() == pytest.approx(0.8)
+
+
+def test_total_solar_external_plus_mppt():
+    tracker = _make_solar_tracker(
+        {"sensor.aps": _w(1500)}, "sensor.aps", [_vunit("vA", 800), _vunit("vD", 200)]
+    )
+    assert tracker._read_total_solar_power_kw() == pytest.approx(2.5)
+
+
+def test_total_solar_ignores_non_pv_versions():
+    # v2 has no MPPT registers; it must not contribute.
+    tracker = _make_solar_tracker({}, None, [_vunit("v2", 999)])
+    assert tracker._read_total_solar_power_kw() is None
+
+
+def test_total_solar_none_when_no_source():
+    tracker = _make_solar_tracker({}, None, [])
+    assert tracker._read_total_solar_power_kw() is None

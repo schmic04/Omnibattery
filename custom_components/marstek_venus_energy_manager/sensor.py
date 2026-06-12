@@ -192,7 +192,11 @@ async def async_setup_entry(
 
     # Exact daily energy totals from the real power sensors (panel "Energía hoy").
     # Each is added only when its source sensor is configured.
-    if controller and getattr(controller, "solar_production_sensor", None):
+    # Daily solar = external solar sensor + Venus DC-coupled PV (MPPT on vA/vD),
+    # so it is added when either source exists (decoupled from external config so
+    # removing that sensor no longer makes the entity unavailable).
+    has_mppt_pv = any(c.battery_version in ("vA", "vD") for c in coordinators)
+    if controller and (getattr(controller, "solar_production_sensor", None) or has_mppt_pv):
         entities.append(DailySolarEnergySensor(controller))
     # Added when a dedicated household sensor OR the (always-present) net grid
     # meter is configured: with no household sensor the daily total is derived
@@ -1251,9 +1255,10 @@ class NonResponsiveBatteriesSensor(SensorEntity):
 
 
 class DailySolarEnergySensor(SensorEntity):
-    """Exact daily solar production (kWh), integrated from the real solar power sensor.
+    """Exact daily solar production (kWh), integrated from the real solar power.
 
-    The controller integrates the configured solar_production_sensor at control-loop
+    The controller integrates total solar — the configured solar_production_sensor
+    plus each Venus vA/vD unit's DC-coupled PV (MPPT inputs) — at control-loop
     cadence and resets at local midnight (see ConsumptionTracker); this entity just
     surfaces that running total. total_increasing so HA handles the daily reset.
     """

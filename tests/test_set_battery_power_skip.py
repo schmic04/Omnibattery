@@ -20,6 +20,7 @@ from custom_components.marstek_venus_energy_manager import ChargeDischargeContro
 from custom_components.marstek_venus_energy_manager.const import (
     PD_READBACK_EVERY_N_WRITES,
 )
+from custom_components.marstek_venus_energy_manager.drivers import SetpointResult
 from tests.conftest import FakeCoordinator
 
 
@@ -32,7 +33,14 @@ def _Coord(data):
         balance_hold=False,
         min_soc=10,
         data=data,
-        write_power_atomic=AsyncMock(),
+        apply_power=AsyncMock(),
+    )
+
+
+def _ok(net, *, confirmed=True, battery_power_w=None):
+    """A successful confirmed SetpointResult, as coordinator.apply_power returns."""
+    return SetpointResult(
+        ok=True, net_power_w=net, confirmed=confirmed, battery_power_w=battery_power_w,
     )
 
 
@@ -58,7 +66,7 @@ async def test_skip_when_idle_unchanged():
     result = await ChargeDischargeController._set_battery_power(ctrl, coord, 0, 0)
 
     assert result is True
-    coord.write_power_atomic.assert_not_called()
+    coord.apply_power.assert_not_called()
 
 
 async def test_skip_when_discharge_unchanged_and_delivering():
@@ -73,7 +81,7 @@ async def test_skip_when_discharge_unchanged_and_delivering():
     result = await ChargeDischargeController._set_battery_power(ctrl, coord, 0, 300)
 
     assert result is True
-    coord.write_power_atomic.assert_not_called()
+    coord.apply_power.assert_not_called()
 
 
 async def test_skip_when_charge_unchanged():
@@ -83,7 +91,7 @@ async def test_skip_when_charge_unchanged():
     result = await ChargeDischargeController._set_battery_power(ctrl, coord, 500, 0)
 
     assert result is True
-    coord.write_power_atomic.assert_not_called()
+    coord.apply_power.assert_not_called()
 
 
 async def test_no_skip_when_discharge_unchanged_but_not_delivering():
@@ -97,12 +105,8 @@ async def test_no_skip_when_discharge_unchanged_but_not_delivering():
         "battery_soc": 80,   # above BMS cutoff floor -> a real fault, not protection
         "inverter_state": None,
     })
-    coord.write_power_atomic = AsyncMock(return_value={
-        "force_mode": 2,
-        "set_charge_power": 0,
-        "set_discharge_power": 300,
-        "battery_power": 0,
-    })
+    # ACK'd (confirmed) but delivering 0 W -> non-delivery tracker must fire.
+    coord.apply_power = AsyncMock(return_value=_ok(-300, battery_power_w=0))
     ctrl = _controller()
     record = MagicMock(return_value=False)  # sync: not awaited in _set_battery_power
     ctrl._non_responsive.record_non_delivery = record
@@ -110,7 +114,7 @@ async def test_no_skip_when_discharge_unchanged_but_not_delivering():
     result = await ChargeDischargeController._set_battery_power(ctrl, coord, 0, 300)
 
     assert result is True
-    coord.write_power_atomic.assert_called_once()
+    coord.apply_power.assert_called_once()
     record.assert_called_once()
 
 
@@ -121,18 +125,13 @@ async def test_no_skip_when_setpoints_differ():
         "set_discharge_power": 100,  # device at 100W, commanding 300W
         "battery_power": -100,
     })
-    coord.write_power_atomic = AsyncMock(return_value={
-        "force_mode": 2,
-        "set_charge_power": 0,
-        "set_discharge_power": 300,
-        "battery_power": -300,
-    })
+    coord.apply_power = AsyncMock(return_value=_ok(-300, battery_power_w=-300))
     ctrl = _controller()
 
     result = await ChargeDischargeController._set_battery_power(ctrl, coord, 0, 300)
 
     assert result is True
-    coord.write_power_atomic.assert_called_once()
+    coord.apply_power.assert_called_once()
 
 
 async def test_readback_throttled_to_every_n_writes():
@@ -150,18 +149,16 @@ async def test_readback_throttled_to_every_n_writes():
     })
     seen_read_back: list[bool] = []
 
-    async def fake_write(discharge, charge, force, read_back=True):
+    async def fake_apply(net, read_back=True):
         seen_read_back.append(read_back)
-        result = {
-            "force_mode": force,
-            "set_charge_power": charge,
-            "set_discharge_power": discharge,
-        }
-        if read_back:
-            result["battery_power"] = 0
-        return result
+        # Write-only cycles return unconfirmed (no readback); verify cycles
+        # confirm and carry delivered power (0 W -> non-delivery still fires).
+        return SetpointResult(
+            ok=True, net_power_w=net, confirmed=read_back,
+            battery_power_w=0 if read_back else None,
+        )
 
-    coord.write_power_atomic = fake_write
+    coord.apply_power = fake_apply
     ctrl = _controller()
     ctrl._non_responsive.record_non_delivery = MagicMock(return_value=False)
 
@@ -178,15 +175,10 @@ async def test_readback_throttled_to_every_n_writes():
 
 async def test_no_skip_when_data_missing():
     coord = _Coord({})  # no setpoints known yet (pre-first-poll)
-    coord.write_power_atomic = AsyncMock(return_value={
-        "force_mode": 2,
-        "set_charge_power": 0,
-        "set_discharge_power": 300,
-        "battery_power": -300,
-    })
+    coord.apply_power = AsyncMock(return_value=_ok(-300, battery_power_w=-300))
     ctrl = _controller()
 
     result = await ChargeDischargeController._set_battery_power(ctrl, coord, 0, 300)
 
     assert result is True
-    coord.write_power_atomic.assert_called_once()
+    coord.apply_power.assert_called_once()

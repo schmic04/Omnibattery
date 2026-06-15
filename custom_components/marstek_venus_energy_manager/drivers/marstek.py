@@ -17,6 +17,7 @@ duplicated logic.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Optional
 
@@ -61,6 +62,7 @@ class MarstekModbusDriver(BatteryDriver):
         """
         self._version = version
         self._is_v3_family = version in _V3_FAMILY
+        self._slave_id = slave_id
 
         if client is None:
             client = MarstekModbusClient(
@@ -169,22 +171,26 @@ class MarstekModbusDriver(BatteryDriver):
 
         +net = charge, -net = discharge, 0 = idle. Magnitude is clamped to the
         capability envelope. Writes all three registers, then optionally reads
-        them back to confirm.
+        them back (after a settle delay) to confirm and to capture delivered
+        power. The three writes happen back-to-back; the coordinator holds its
+        lock around this call so a poll read cannot interleave (v3 atomicity).
         """
+        self._client.unit_id = self._slave_id
+
         if net_power_w > 0:
             charge = min(net_power_w, self._capabilities.max_charge_power_w)
             discharge = 0
             force_mode = _FORCE_CHARGE
-            applied = charge
+            applied_net = charge
         elif net_power_w < 0:
             charge = 0
             discharge = min(-net_power_w, self._capabilities.max_discharge_power_w)
             force_mode = _FORCE_DISCHARGE
-            applied = -discharge
+            applied_net = -discharge
         else:
             charge = discharge = 0
             force_mode = _FORCE_NONE
-            applied = 0
+            applied_net = 0
 
         charge_reg = self.get_register("set_charge_power")
         discharge_reg = self.get_register("set_discharge_power")
@@ -196,16 +202,48 @@ class MarstekModbusDriver(BatteryDriver):
         ok2 = await self._client.async_write_register(charge_reg, charge)
         ok3 = await self._client.async_write_register(force_reg, force_mode)
         if not (ok1 and ok2 and ok3):
-            return SetpointResult(ok=False, net_power_w=applied, confirmed=False, failure_reason="write_failed")
+            return SetpointResult(
+                ok=False, net_power_w=applied_net, confirmed=False,
+                failure_reason="modbus_write_failed",
+            )
 
+        # Brand-native echo for the coordinator's telemetry cache. On a write-only
+        # cycle the regular poll refreshes battery_power, so only the set-points
+        # are reported (optimistic).
         if not read_back:
-            return SetpointResult(ok=True, net_power_w=applied, confirmed=False)
+            applied = {
+                "force_mode": force_mode,
+                "set_charge_power": charge,
+                "set_discharge_power": discharge,
+            }
+            return SetpointResult(ok=True, net_power_w=applied_net, confirmed=False, applied=applied)
+
+        # Let the battery process the commands before reading them back.
+        await asyncio.sleep(0.2)
 
         force_fb = await self._client.async_read_register(force_reg, "uint16")
         charge_fb = await self._client.async_read_register(charge_reg, "uint16")
         discharge_fb = await self._client.async_read_register(discharge_reg, "uint16")
-        if None in (force_fb, charge_fb, discharge_fb):
-            return SetpointResult(ok=True, net_power_w=applied, confirmed=False, failure_reason="feedback_timeout")
+        power_reg = self.get_register("battery_power")
+        power_fb = (
+            await self._client.async_read_register(power_reg, self._power_dtype)
+            if power_reg is not None else None
+        )
+        if None in (force_fb, charge_fb, discharge_fb, power_fb):
+            # Writes were accepted but the readback never followed. No telemetry
+            # echo — the coordinator leaves coordinator.data to the next poll.
+            return SetpointResult(
+                ok=True, net_power_w=applied_net, confirmed=False, failure_reason="feedback_timeout",
+            )
 
         confirmed = force_fb == force_mode and charge_fb == charge and discharge_fb == discharge
-        return SetpointResult(ok=True, net_power_w=applied, confirmed=confirmed)
+        applied = {
+            "force_mode": force_fb,
+            "set_charge_power": charge_fb,
+            "set_discharge_power": discharge_fb,
+            "battery_power": power_fb,
+        }
+        return SetpointResult(
+            ok=True, net_power_w=applied_net, confirmed=confirmed,
+            battery_power_w=power_fb, applied=applied,
+        )

@@ -75,6 +75,17 @@ class SetpointResult:
     # Brief machine-readable reason when ``ok`` is False (e.g. "write_failed",
     # "not_connected", "feedback_timeout"). None on success.
     failure_reason: Optional[str] = None
+    # Measured delivered power (signed W, +charge / -discharge) read back from the
+    # hardware on a confirmation cycle; None on the write-only fast path
+    # (``read_back=False``). Universal telemetry the control layer uses for
+    # non-delivery detection — independent of any register/property layout.
+    battery_power_w: Optional[int] = None
+    # Brand-native state echo for the coordinator's telemetry cache
+    # (``coordinator.data``). The coordinator merges this verbatim so it need not
+    # know the keys: Marstek returns ``force_mode`` + ``set_charge_power`` +
+    # ``set_discharge_power`` (plus ``battery_power`` on a readback cycle). None
+    # only when the command failed before anything was applied.
+    applied: Optional[dict] = None
 
 
 # Telemetry is a flat mapping of logical sensor key -> decoded value, exactly the

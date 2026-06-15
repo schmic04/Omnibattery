@@ -17,7 +17,6 @@ import pytest
 from custom_components.marstek_venus_energy_manager.drivers import (
     DriverCapabilities,
     MarstekModbusDriver,
-    SetpointResult,
 )
 from custom_components.marstek_venus_energy_manager.const import REGISTER_MAP
 
@@ -43,6 +42,18 @@ _DEFS = [
     {"key": "battery_power", "register": 30001, "data_type": "int16", "count": 1},
     {"key": "no_register", "name": "calc-only"},  # no register -> not indexed
 ]
+
+
+@pytest.fixture(autouse=True)
+def _no_settle(monkeypatch):
+    """Skip the real 0.2 s post-write settle so readback tests stay fast."""
+    async def _instant(*_a, **_k):
+        return None
+
+    monkeypatch.setattr(
+        "custom_components.marstek_venus_energy_manager.drivers.marstek.asyncio.sleep",
+        _instant,
+    )
 
 
 # ----------------------------------------------------------------------
@@ -109,7 +120,12 @@ async def test_apply_setpoint_charge_sets_force_mode_1():
 
     res = await drv.apply_setpoint(600, read_back=False)
 
-    assert res == SetpointResult(ok=True, net_power_w=600, confirmed=False)
+    assert res.ok is True
+    assert res.net_power_w == 600
+    assert res.confirmed is False
+    # write-only cycle: optimistic set-point echo, no battery_power
+    assert res.applied == {"force_mode": 1, "set_charge_power": 600, "set_discharge_power": 0}
+    assert res.battery_power_w is None
     reg = REGISTER_MAP["v3"]
     writes = {c.args[0]: c.args[1] for c in client.async_write_register.call_args_list}
     assert writes[reg["set_charge_power"]] == 600
@@ -158,25 +174,69 @@ async def test_apply_setpoint_reports_write_failure():
     res = await drv.apply_setpoint(600)
 
     assert res.ok is False
-    assert res.failure_reason == "write_failed"
+    assert res.failure_reason == "modbus_write_failed"
 
 
 async def test_apply_setpoint_confirms_on_matching_readback():
     client = _fake_client()
-    # readback order in driver: force, charge, discharge
-    client.async_read_register = AsyncMock(side_effect=[1, 600, 0])
+    # readback order in driver: force, charge, discharge, battery_power
+    client.async_read_register = AsyncMock(side_effect=[1, 600, 0, 590])
     drv = _driver("v3", client=client)
 
     res = await drv.apply_setpoint(600, read_back=True)
 
     assert res.ok is True and res.confirmed is True
+    # delivered power surfaced for non-delivery detection + telemetry echo
+    assert res.battery_power_w == 590
+    assert res.applied == {
+        "force_mode": 1, "set_charge_power": 600, "set_discharge_power": 0,
+        "battery_power": 590,
+    }
 
 
 async def test_apply_setpoint_unconfirmed_on_mismatched_readback():
     client = _fake_client()
-    client.async_read_register = AsyncMock(side_effect=[1, 500, 0])  # charge != 600
+    client.async_read_register = AsyncMock(side_effect=[1, 500, 0, 480])  # charge != 600
     drv = _driver("v3", client=client)
 
     res = await drv.apply_setpoint(600, read_back=True)
 
     assert res.ok is True and res.confirmed is False
+    # echo carries the *readback* values, not the commanded ones
+    assert res.applied["set_charge_power"] == 500
+    assert res.battery_power_w == 480
+
+
+async def test_apply_setpoint_feedback_timeout_when_readback_fails():
+    client = _fake_client()
+    # battery_power read (4th) returns None -> readback incomplete
+    client.async_read_register = AsyncMock(side_effect=[1, 600, 0, None])
+    drv = _driver("v3", client=client)
+
+    res = await drv.apply_setpoint(600, read_back=True)
+
+    assert res.ok is True  # the writes themselves succeeded
+    assert res.confirmed is False
+    assert res.failure_reason == "feedback_timeout"
+    # no telemetry echo -> coordinator leaves coordinator.data to the next poll
+    assert res.applied is None
+    assert res.battery_power_w is None
+
+
+async def test_apply_setpoint_write_only_echoes_setpoints_without_battery_power():
+    drv = _driver("v3", client=_fake_client())
+
+    res = await drv.apply_setpoint(-450, read_back=False)
+
+    assert res.applied == {"force_mode": 2, "set_charge_power": 0, "set_discharge_power": 450}
+    assert "battery_power" not in res.applied
+    assert res.battery_power_w is None
+
+
+async def test_apply_setpoint_addresses_configured_slave():
+    client = _fake_client()
+    drv = _driver("v3", slave_id=7, client=client)
+
+    await drv.apply_setpoint(100, read_back=False)
+
+    assert client.unit_id == 7

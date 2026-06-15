@@ -24,6 +24,7 @@ from .const import (
 )
 from .modbus_client import decode_registers
 from .drivers.marstek import MarstekModbusDriver
+from .drivers.base import SetpointResult
 from .alarm_notifier import AlarmNotifier
 
 _LOGGER = logging.getLogger(__name__)
@@ -529,7 +530,7 @@ class MarstekVenusDataUpdateCoordinator(DataUpdateCoordinator):
                 # Yield to the event loop so the PD control writer waiting on
                 # self.lock can acquire it before this loop re-enters async with.
                 # Without this yield, asyncio never gets a tick to hand the lock
-                # to the waiter — the tight for-loop starves write_power_atomic.
+                # to the waiter — the tight for-loop starves apply_power.
                 await asyncio.sleep(0)
 
                 if value is not None:
@@ -825,108 +826,48 @@ class MarstekVenusDataUpdateCoordinator(DataUpdateCoordinator):
                     _LOGGER.warning("[%s] Failed to read power feedback: %s", self.name, e)
                 return None
 
-    async def write_power_atomic(
-        self, discharge_power: int, charge_power: int, force_mode: int,
-        read_back: bool = True,
-    ) -> dict | None:
-        """Write all power registers and read feedback atomically under a single lock.
+    async def apply_power(self, net_power_w: int, read_back: bool = True) -> SetpointResult:
+        """Command a signed net power (+charge / -discharge) via the driver.
 
-        This prevents coordinator polling reads from interleaving with control loop
-        writes, which causes the v3 firmware to miss or corrupt commands.
+        Semantic write entry point for the control layer: the driver translates
+        the net power to its own wire format (Marstek: force_mode + charge/
+        discharge set-points) and performs the writes — plus, on a readback cycle,
+        the confirmation read — while this coordinator holds ``self.lock`` so a
+        poll read cannot interleave (v3 single-slot atomicity).
 
-        When ``read_back`` is False the three registers are written but not read
-        back (and the post-write settle delay is skipped) to cut bus traffic — the
-        regular poll keeps coordinator.data fresh. The written set-points are still
-        applied to coordinator.data optimistically so the control loop and
-        diagnostics see the command. Returns a dict on success or None on failure;
-        on a write-only success the dict carries only the written set-points (no
-        ``battery_power`` key, since nothing was read).
+        Bookkeeping that belongs to the coordinator, not the hardware driver, stays
+        here: the brand-native telemetry echo is merged into ``coordinator.data``,
+        and the health counters / last-failure reason are updated from the result.
+        When ``read_back`` is False the set-points are applied optimistically and
+        the regular poll refreshes ``battery_power``.
         """
         async with self.lock:
-            self.client.unit_id = self.slave_id
-
-            discharge_reg = self.get_register("set_discharge_power")
-            charge_reg = self.get_register("set_charge_power")
-            force_reg = self.get_register("force_mode")
-            battery_power_reg = self.get_register("battery_power")
-
-            if None in [discharge_reg, charge_reg, force_reg, battery_power_reg]:
-                if not self._is_shutting_down:
-                    _LOGGER.error("[%s] Missing required registers for atomic power write", self.name)
-                self._last_write_failure_reason = "missing_registers"
-                return None
-
             try:
-                # Write all 3 registers without releasing lock. The client itself
-                # sleeps MESSAGE_WAIT_MS after every request, so no extra
-                # inter-write delay is needed here.
-                ok1 = await self.client.async_write_register(discharge_reg, discharge_power)
-                ok2 = await self.client.async_write_register(charge_reg, charge_power)
-                ok3 = await self.client.async_write_register(force_reg, force_mode)
+                result = await self.driver.apply_setpoint(net_power_w, read_back=read_back)
+            except Exception as e:
+                if not self._is_shutting_down:
+                    _LOGGER.warning("[%s] Power setpoint write failed: %s", self.name, e)
+                self._last_write_failure_reason = "modbus_exception"
+                return SetpointResult(
+                    ok=False, net_power_w=0, confirmed=False, failure_reason="modbus_exception",
+                )
 
-                if not (ok1 and ok2 and ok3):
-                    if not self._is_shutting_down:
-                        _LOGGER.warning(
-                            "[%s] Atomic power write partial failure: discharge=%s, charge=%s, force=%s",
-                            self.name, ok1, ok2, ok3
-                        )
-                    self._last_write_failure_reason = "modbus_write_failed"
-                    return None
-
-                # Write-only cycle: skip the readback (and its settle delay) to cut
-                # bus traffic. Apply the written set-points to data optimistically;
-                # battery_power is left to the regular poll.
-                if not read_back:
-                    if self.data:
-                        self.data["force_mode"] = force_mode
-                        self.data["set_charge_power"] = charge_power
-                        self.data["set_discharge_power"] = discharge_power
-                    self._consecutive_failures = 0
-                    self._is_connected = True
-                    self._last_write_failure_reason = None
-                    return {
-                        "force_mode": force_mode,
-                        "set_charge_power": charge_power,
-                        "set_discharge_power": discharge_power,
-                    }
-
-                # Wait for battery to process commands
-                await asyncio.sleep(0.2)
-
-                # Read feedback within same lock (no interleaving)
-                power_dtype = "int16" if self.battery_version in ("v3", "vA", "vD") else "int32"
-                force_fb = await self.client.async_read_register(force_reg, "uint16")
-                charge_fb = await self.client.async_read_register(charge_reg, "uint16")
-                discharge_fb = await self.client.async_read_register(discharge_reg, "uint16")
-                power_fb = await self.client.async_read_register(battery_power_reg, power_dtype)
-
-                if None in (force_fb, charge_fb, discharge_fb, power_fb):
-                    if not self._is_shutting_down:
-                        _LOGGER.warning("[%s] Atomic power feedback read failed", self.name)
-                    # Writes were accepted but the readback never followed.
-                    self._last_write_failure_reason = "feedback_timeout"
-                    return None
-
-                # Update coordinator.data with fresh values
-                if self.data:
-                    self.data["force_mode"] = force_fb
-                    self.data["set_charge_power"] = charge_fb
-                    self.data["set_discharge_power"] = discharge_fb
-                    self.data["battery_power"] = power_fb
-
-                # Successful write+read confirms healthy connection
+            if result.ok and result.failure_reason is None:
+                # Clean write (write-only) or clean write+readback: merge the
+                # telemetry echo and mark the connection healthy.
+                if result.applied and self.data:
+                    self.data.update(result.applied)
                 self._consecutive_failures = 0
                 self._is_connected = True
                 self._last_write_failure_reason = None
+            else:
+                # Write failed, registers missing, or the readback timed out — no
+                # data merge, no health reset; surface the reason to the tracker.
+                if not self._is_shutting_down and not result.ok:
+                    _LOGGER.warning(
+                        "[%s] Power setpoint not applied (reason=%s)",
+                        self.name, result.failure_reason,
+                    )
+                self._last_write_failure_reason = result.failure_reason
 
-                return {
-                    "force_mode": force_fb,
-                    "set_charge_power": charge_fb,
-                    "set_discharge_power": discharge_fb,
-                    "battery_power": power_fb,
-                }
-            except Exception as e:
-                if not self._is_shutting_down:
-                    _LOGGER.warning("[%s] Atomic power write failed: %s", self.name, e)
-                self._last_write_failure_reason = "modbus_exception"
-                return None
+            return result

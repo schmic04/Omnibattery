@@ -48,7 +48,7 @@ class FakeCoordinator:
         "min_soc": 10,
         "rs485_user_disabled": False,
         "balance_hold": False,
-        "write_power_atomic": None,
+        "apply_power": None,
     }
 
     def __init__(self, **kw):

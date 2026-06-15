@@ -844,12 +844,13 @@ class ChargeDischargeController:
                 )
                 continue
 
-            if direction == "charge":
-                feedback = await coord.write_power_atomic(0, power, 1)
-            else:
-                feedback = await coord.write_power_atomic(power, 0, 2)
+            net = power if direction == "charge" else -power
+            result = await coord.apply_power(net)
 
-            if feedback is None:
+            # Failure = writes rejected (not ok) or the confirmation read never
+            # followed (feedback_timeout, ok but flagged) — same set the old
+            # atomic write reported as None.
+            if not result.ok or result.failure_reason is not None:
                 _LOGGER.warning("[%s] Manual slot write failed", coord.name)
                 continue
 
@@ -2753,11 +2754,10 @@ class ChargeDischargeController:
         *,
         command: str,
         commanded_power: float,
-        feedback: dict,
+        actual_power: float,
     ) -> None:
         """Log a compact diagnostic when ACK succeeds but delivered power is low."""
         data = coordinator.data or {}
-        actual_power = feedback["battery_power"]
         actual_abs = abs(actual_power)
         threshold = max(25.0, commanded_power * 0.10)
 
@@ -2765,15 +2765,11 @@ class ChargeDischargeController:
             return
 
         _LOGGER.debug(
-            "[%s] Power delivery low: command=%s commanded=%dW "
-            "readback(force=%d charge=%dW discharge=%dW) actual=%dW "
+            "[%s] Power delivery low: command=%s commanded=%dW actual=%dW "
             "threshold=%.0fW soc=%s%% min_soc=%d%% max_soc=%d%% inverter=%s",
             coordinator.name,
             command,
             int(commanded_power),
-            feedback["force_mode"],
-            feedback["set_charge_power"],
-            feedback["set_discharge_power"],
             actual_power,
             threshold,
             data.get("battery_soc"),
@@ -2924,20 +2920,26 @@ class ChargeDischargeController:
         coordinator._pd_write_count = write_count + 1
         read_back = (write_count % PD_READBACK_EVERY_N_WRITES) == 0
 
-        # Attempt atomic write + verify, with one retry on failure.
+        # Translate the control decision into one signed net power for the
+        # brand-agnostic driver: +charge / -discharge / 0 = idle. charge_power and
+        # discharge_power are mutually exclusive here, so the sign maps 1:1 to
+        # expected_force_mode.
+        if charge_power > 0:
+            net_power = int(charge_power)
+        elif discharge_power > 0:
+            net_power = -int(discharge_power)
+        else:
+            net_power = 0
+
+        # Attempt the setpoint + verify, with one retry on failure.
         # last_fail_reason carries the most specific failure category seen across
         # both attempts so the non-responsive tracker can surface *why*.
         last_fail_reason: str | None = None
         for attempt in range(2):
-            feedback = await coordinator.write_power_atomic(
-                int(discharge_power), int(charge_power), expected_force_mode,
-                read_back=read_back,
-            )
+            result = await coordinator.apply_power(net_power, read_back=read_back)
 
-            if feedback is None:
-                last_fail_reason = getattr(
-                    coordinator, "_last_write_failure_reason", None
-                ) or "comm_failure"
+            if not result.ok:
+                last_fail_reason = result.failure_reason or "comm_failure"
                 if not coordinator._is_shutting_down:
                     _LOGGER.warning(
                         "[%s] Power write/feedback failed (attempt %d/2, reason=%s)",
@@ -2956,43 +2958,33 @@ class ChargeDischargeController:
                 )
                 return True
 
-            # Verify ACK - check if written values match readback
-            ack_ok = (
-                feedback["force_mode"] == expected_force_mode and
-                feedback["set_charge_power"] == int(charge_power) and
-                feedback["set_discharge_power"] == int(discharge_power)
-            )
-
-            if ack_ok:
+            if result.confirmed:
+                actual_power = result.battery_power_w
                 _LOGGER.debug(
-                    "[%s] Power ACK: requested(force=%d charge=%dW discharge=%dW) "
-                    "readback(force=%d charge=%dW discharge=%dW battery=%dW)",
+                    "[%s] Power ACK: force=%d charge=%dW discharge=%dW battery=%dW",
                     coordinator.name,
                     expected_force_mode,
                     int(charge_power),
                     int(discharge_power),
-                    feedback["force_mode"],
-                    feedback["set_charge_power"],
-                    feedback["set_discharge_power"],
-                    feedback["battery_power"],
+                    actual_power,
                 )
                 if charge_power > 0:
                     self._log_low_power_delivery(
                         coordinator,
                         command="charge",
                         commanded_power=charge_power,
-                        feedback=feedback,
+                        actual_power=actual_power,
                     )
                 elif discharge_power > 0:
                     self._log_low_power_delivery(
                         coordinator,
                         command="discharge",
                         commanded_power=discharge_power,
-                        feedback=feedback,
+                        actual_power=actual_power,
                     )
                 # Detect non-responsive battery: ACK ok but not delivering discharge power
                 if discharge_power >= 100 and charge_power == 0:
-                    actual_abs = abs(feedback["battery_power"])
+                    actual_abs = abs(actual_power)
                     if actual_abs < 0.10 * discharge_power:
                         # Skip non-responsive recording when the BMS is legitimately
                         # refusing discharge: either at/near the configured min-SOC, or
@@ -3052,21 +3044,30 @@ class ChargeDischargeController:
                         self._non_responsive.clear(coordinator)
                 return True
 
-            last_fail_reason = "ack_mismatch"
+            # Readback happened but the set-points did not match (mismatch), or the
+            # confirmation read never followed (feedback_timeout). Both retryable.
+            last_fail_reason = result.failure_reason or "ack_mismatch"
             if attempt == 0:
-                _LOGGER.warning(
-                    "[%s] Power command not ACK'd (attempt 1/2), retrying. "
-                    "requested(force=%d charge=%dW discharge=%dW) "
-                    "readback(force=%d charge=%dW discharge=%dW battery=%dW)",
-                    coordinator.name,
-                    expected_force_mode,
-                    int(charge_power),
-                    int(discharge_power),
-                    feedback["force_mode"],
-                    feedback["set_charge_power"],
-                    feedback["set_discharge_power"],
-                    feedback["battery_power"],
-                )
+                if result.failure_reason == "feedback_timeout":
+                    _LOGGER.warning(
+                        "[%s] Power feedback read failed (attempt 1/2), retrying.",
+                        coordinator.name,
+                    )
+                else:
+                    echo = result.applied or {}
+                    _LOGGER.warning(
+                        "[%s] Power command not ACK'd (attempt 1/2), retrying. "
+                        "requested(force=%d charge=%dW discharge=%dW) "
+                        "readback(force=%s charge=%sW discharge=%sW battery=%sW)",
+                        coordinator.name,
+                        expected_force_mode,
+                        int(charge_power),
+                        int(discharge_power),
+                        echo.get("force_mode"),
+                        echo.get("set_charge_power"),
+                        echo.get("set_discharge_power"),
+                        echo.get("battery_power"),
+                    )
 
         # Both attempts failed at the Modbus/ACK level — feed the tracker so the
         # diagnostic sensor can report the specific reason (and so repeated comms

@@ -1,0 +1,153 @@
+"""Brand-agnostic battery driver contract.
+
+This is the seam between the control layer (coordinator + ChargeDischargeController)
+and the hardware. It is deliberately *semantic*, not register-shaped: the only
+operations it exposes are "give me a telemetry snapshot" and "deliver this net
+power". A Modbus/register battery (Marstek) and an MQTT/property battery (Zendure)
+can both sit behind it because neither register addresses nor MQTT topics appear
+in the contract.
+
+Two model differences the contract reconciles:
+
+* **Poll vs push.** Marstek is polled every ~1.5 s; Zendure pushes telemetry over
+  MQTT. :meth:`BatteryDriver.read_telemetry` is a *pull* of the latest known
+  state — a push-based driver caches the last message and returns it, so the
+  coordinator's poll loop is unchanged.
+* **Control semantics.** Marstek wants ``force_mode`` + separate charge/discharge
+  set-point registers; Zendure wants an input/output limit. The control loop
+  speaks a single signed *net power* (+charge / -discharge) via
+  :meth:`BatteryDriver.apply_setpoint`; each driver translates to its own wire
+  format internally.
+
+Nothing imports this module yet — it defines the target contract. It is filled
+in incrementally; see ``docs/plans/driver_abstraction.md`` for the phase plan.
+"""
+
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Optional
+
+
+@dataclass(frozen=True)
+class DriverCapabilities:
+    """Static, brand/model-specific traits the control layer branches on.
+
+    Replaces the ``if self.battery_version in ("v3", "vA", "vD")`` checks that are
+    currently scattered through the coordinator and control loop. A driver reports
+    its capabilities once; callers consult them instead of hard-coding versions.
+    """
+
+    # True if the hardware enforces SOC charge/discharge cut-offs itself. When
+    # False the control layer must enforce min/max SOC in software (Marstek v3/vA/vD
+    # have no cut-off registers; v2 does).
+    hardware_soc_cutoff: bool
+
+    # True if the hardware supports a distinct force/charge/discharge mode command
+    # (Marstek force_mode). A driver that only takes a signed power limit reports
+    # False and ignores the ``mode`` hint in apply_setpoint.
+    has_force_mode: bool
+
+    # Telemetry arrives by push (MQTT) rather than poll (Modbus). The coordinator
+    # uses this to decide whether read_telemetry is a live read or a cache read.
+    push_telemetry: bool
+
+    # Inclusive power envelope the hardware accepts, in watts (per battery unit).
+    max_charge_power_w: int
+    max_discharge_power_w: int
+
+
+@dataclass(frozen=True)
+class SetpointResult:
+    """Outcome of an :meth:`BatteryDriver.apply_setpoint` call.
+
+    ``net_power_w`` is the commanded signed power that was actually applied
+    (+charge / -discharge), clamped to the driver's envelope. ``confirmed`` is
+    True only when the driver read the command back from the hardware and it
+    matched; a write-only fast path returns the optimistic command with
+    ``confirmed=False``.
+    """
+
+    ok: bool
+    net_power_w: int
+    confirmed: bool
+    # Brief machine-readable reason when ``ok`` is False (e.g. "write_failed",
+    # "not_connected", "feedback_timeout"). None on success.
+    failure_reason: Optional[str] = None
+
+
+# Telemetry is a flat mapping of logical sensor key -> decoded value, exactly the
+# shape the coordinator already stores in ``coordinator.data`` today (e.g.
+# {"battery_soc": 47, "battery_power": -612, ...}). Kept as a plain dict so the
+# existing sensor/aggregate layers need no change.
+TelemetrySnapshot = dict
+
+
+class BatteryDriver(ABC):
+    """Abstract hardware driver for a single physical battery.
+
+    One instance per battery (per coordinator). Owns its transport and connection
+    state. All methods are async because every real transport (Modbus TCP, MQTT)
+    is I/O bound.
+    """
+
+    # --- identity -----------------------------------------------------------
+
+    @property
+    @abstractmethod
+    def capabilities(self) -> DriverCapabilities:
+        """Static traits of this battery (see :class:`DriverCapabilities`)."""
+
+    # --- connection lifecycle ----------------------------------------------
+
+    @property
+    @abstractmethod
+    def connected(self) -> bool:
+        """Whether the driver currently holds a live link to the hardware."""
+
+    @abstractmethod
+    async def connect(self) -> bool:
+        """Establish the link. Return True on success. Idempotent / re-callable."""
+
+    @abstractmethod
+    async def close(self) -> None:
+        """Tear the link down and release any single-slot resource (e.g. the v3
+        TCP slot). Safe to call when already closed."""
+
+    @abstractmethod
+    def set_shutting_down(self, value: bool) -> None:
+        """Suppress error logging during integration unload / HA shutdown."""
+
+    # --- telemetry (read) ---------------------------------------------------
+
+    @abstractmethod
+    async def read_telemetry(self, keys: Optional[list[str]] = None) -> TelemetrySnapshot:
+        """Return the latest decoded telemetry as a logical-key -> value mapping.
+
+        ``keys`` optionally restricts the read to the given logical keys (used by
+        the coordinator to honour per-sensor poll intervals and skip disabled
+        entities); None means "everything this driver knows". A polled driver
+        reads the hardware now; a push driver returns its cached last state.
+        Missing/failed values are omitted rather than set to None.
+        """
+
+    # --- control (write) ----------------------------------------------------
+
+    @abstractmethod
+    async def apply_setpoint(
+        self,
+        net_power_w: int,
+        *,
+        mode_hint: Optional[str] = None,
+        read_back: bool = True,
+    ) -> SetpointResult:
+        """Command a signed net power: +charge / -discharge, 0 = idle/hold.
+
+        The driver translates to its own wire format (Marstek: force_mode +
+        charge/discharge registers; Zendure: input/output limit). ``mode_hint``
+        is an optional control-layer intent ("charge"/"discharge"/"idle") that
+        drivers with an explicit mode command may use; sign of ``net_power_w`` is
+        authoritative. ``read_back=False`` skips confirmation to cut bus traffic
+        (result carries ``confirmed=False``).
+        """

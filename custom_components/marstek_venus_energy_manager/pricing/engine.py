@@ -492,8 +492,8 @@ class PricingManager:
             if forecast_state and forecast_state.state not in ("unknown", "unavailable"):
                 try:
                     forecast_today = float(forecast_state.state) * 0.85
-                    if self._controller.household_consumption_sensor and self._controller._solar_production_accumulator > 0:
-                        remaining_solar_kwh = max(0.0, forecast_today - self._controller._solar_production_accumulator)
+                    if self._controller._daily_solar_energy_kwh > 0:
+                        remaining_solar_kwh = max(0.0, forecast_today - self._controller._daily_solar_energy_kwh)
                     elif self._controller._solar_t_start is not None:
                         t_end = self._controller._consumption_tracker.estimate_t_end()
                         fraction_done = self._controller._consumption_tracker.get_solar_fraction_done(now_h, self._controller._solar_t_start, t_end)

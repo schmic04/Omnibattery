@@ -28,7 +28,6 @@ from .const import (
     CONF_HOUSEHOLD_CONSUMPTION_SENSOR,
     CONF_SOLAR_PRODUCTION_SENSOR,
     CONF_MAX_CONTRACTED_POWER,
-    should_use_household_sensor,
     DEFAULT_BASE_CONSUMPTION_KWH,
     SOC_REEVALUATION_THRESHOLD,
     CONF_ENABLE_WEEKLY_FULL_CHARGE,
@@ -198,7 +197,6 @@ async def _async_register_frontend_panel(hass: HomeAssistant, entry: ConfigEntry
         panel_config = {"domain": DOMAIN, "title": PANEL_TITLE}
         if entry is not None:
             from .const import (
-                CONF_HOUSEHOLD_CONSUMPTION_SENSOR,
                 CONF_SOLAR_FORECAST_SENSOR,
                 CONF_SOLAR_PRODUCTION_SENSOR,
             )
@@ -213,8 +211,10 @@ async def _async_register_frontend_panel(hass: HomeAssistant, entry: ConfigEntry
                 # the flag so the panel applies the same sign to the Grid node and
                 # the power-history chart.
                 panel_config["grid_inverted"] = bool(data.get(CONF_METER_INVERTED, False))
-            if data.get(CONF_HOUSEHOLD_CONSUMPTION_SENSOR):
-                panel_config["home_entity"] = data[CONF_HOUSEHOLD_CONSUMPTION_SENSOR]
+            # Home node = the integration's derived Home Consumption aggregate sensor
+            # (grid + battery AC + solar). The dedicated household sensor was removed
+            # from the config flow, so the derived sensor is the single home source.
+            panel_config["home_entity"] = "sensor.marstek_venus_system_system_home_consumption"
             if data.get(CONF_SOLAR_FORECAST_SENSOR):
                 panel_config["solar_forecast_entity"] = data[CONF_SOLAR_FORECAST_SENSOR]
             # Real-time PV production for the Solar node when panels are not wired
@@ -420,23 +420,19 @@ class ChargeDischargeController:
         self.predictive_charging_enabled = config_entry.data.get(CONF_ENABLE_PREDICTIVE_CHARGING, False)
         self.charging_time_slot = config_entry.data.get(CONF_CHARGING_TIME_SLOT, None)
         self.solar_forecast_sensor = config_entry.data.get(CONF_SOLAR_FORECAST_SENSOR, None)
-        self.household_consumption_sensor = config_entry.data.get(CONF_HOUSEHOLD_CONSUMPTION_SENSOR, None)
         self.solar_production_sensor = config_entry.data.get(CONF_SOLAR_PRODUCTION_SENSOR, None)
         self.max_contracted_power = config_entry.data.get(CONF_MAX_CONTRACTED_POWER, 7000)
 
-        # Household consumption accumulator (integration of power sensor over solar+battery window)
-        # Owned by ConsumptionTracker (see consumption_tracker.py); these public attrs
-        # remain on the controller so binary_sensor.py and aggregate_sensors.py keep reading them.
+        # Home consumption accumulator (integration of derived home power over the
+        # solar+battery window). Owned by ConsumptionTracker (see consumption_tracker.py);
+        # these public attrs remain on the controller so binary_sensor.py and
+        # aggregate_sensors.py keep reading them.
         self._household_energy_accumulator = 0.0
         self._household_accumulator_date = None  # date when accumulator was last reset
 
-        # Solar production accumulator (house + battery_net - grid, integrated over the day)
-        self._solar_production_accumulator = 0.0
-        self._solar_accumulator_date = None  # date when solar accumulator was last reset
-
         # Exact full-day energy totals, integrated from the REAL power sensors
-        # (solar_production_sensor / household_consumption_sensor) at control-loop
-        # cadence, reset at local midnight, persisted/restored. Surfaced as the
+        # (solar_production_sensor / derived home power) at control-loop cadence,
+        # reset at local midnight, persisted/restored. Surfaced as the
         # system_daily_solar_energy / system_daily_home_energy sensors.
         self._daily_solar_energy_kwh = 0.0
         self._daily_solar_energy_date = None
@@ -681,16 +677,6 @@ class ChargeDischargeController:
     def _normal_balance_reset_if_new_day(self) -> None:
         """Delegate daily reset of top-of-charge state (weekly_full_charge calls this)."""
         self._max_soc_mgr.reset_if_new_day()
-
-    @property
-    def use_household_consumption_sensor(self) -> bool:
-        """Whether to read the household sensor instead of deriving home power.
-
-        Honoured only when a household sensor is configured AND no solar sensor
-        exists; with solar, the derived value (grid + battery AC + solar) is
-        preferred. See should_use_household_sensor().
-        """
-        return should_use_household_sensor(self.config_entry.data)
 
     def _refresh_normal_balance_blocks(self) -> None:
         """Delegate top-of-charge protection blockers to MaxSocChargeManager."""
@@ -961,7 +947,6 @@ class ChargeDischargeController:
             self.config_entry.data.get(CONF_ENABLE_WEEKLY_FULL_CHARGE_DELAY, False)
         )
         self.solar_forecast_sensor = self.config_entry.data.get(CONF_SOLAR_FORECAST_SENSOR, None)
-        self.household_consumption_sensor = self.config_entry.data.get(CONF_HOUSEHOLD_CONSUMPTION_SENSOR, None)
         self.solar_production_sensor = self.config_entry.data.get(CONF_SOLAR_PRODUCTION_SENSOR, None)
         self.predictive_charging_mode = self.config_entry.data.get(CONF_PREDICTIVE_CHARGING_MODE, PREDICTIVE_MODE_TIME_SLOT)
         self.price_sensor = self.config_entry.data.get(CONF_PRICE_SENSOR, None)
@@ -2449,7 +2434,7 @@ class ChargeDischargeController:
             "days_in_history": days_in_history,
             "solar_surplus_kwh": solar_surplus_kwh,
             "grid_charge_kwh": grid_charge_kwh,
-            "consumption_source": "household_sensor" if self.household_consumption_sensor else "battery_discharge",
+            "consumption_source": "derived (grid + battery AC + solar)",
             "reason": (
                 f"Energy deficit: {energy_deficit_kwh:.2f} kWh "
                 f"(available: {total_available_kwh:.2f} kWh < consumption: {avg_consumption_kwh:.2f} kWh"
@@ -3256,7 +3241,6 @@ class ChargeDischargeController:
         if self._consumption_tracker is not None:
             self._consumption_tracker.handle_accumulator_daily_reset()
             await self._consumption_tracker.accumulate_household_consumption()
-            await self._consumption_tracker.accumulate_solar_production()
             # Exact full-day totals from the real power sensors (panel "Energía hoy")
             self._consumption_tracker.handle_daily_energy_reset()
             await self._consumption_tracker.accumulate_daily_solar_energy()
@@ -4230,8 +4214,12 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     v4 -> v5: re-enable cell voltage sensors that the integration disabled before
               they were switched to enabled_by_default. Only re-enables entities
               disabled by the integration, leaving user-disabled ones untouched.
+    v5 -> v6: drop the legacy household_consumption_sensor key. It was removed from
+              the config flow; home consumption is now always derived (grid +
+              battery AC + solar). Leaving it in data let it keep driving consumption
+              calculations on old installs.
     """
-    if entry.version >= 5:
+    if entry.version >= 6:
         return True
 
     new_data = dict(entry.data)
@@ -4324,7 +4312,15 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             count,
         )
 
-    hass.config_entries.async_update_entry(entry, data=new_data, version=5)
+    if entry.version < 6:
+        if new_data.pop(CONF_HOUSEHOLD_CONSUMPTION_SENSOR, None) is not None:
+            _LOGGER.info(
+                "Marstek: migrated config entry to version 6 "
+                "(removed legacy household_consumption_sensor; home consumption is "
+                "now always derived from grid + battery AC + solar)"
+            )
+
+    hass.config_entries.async_update_entry(entry, data=new_data, version=6)
     return True
 
 

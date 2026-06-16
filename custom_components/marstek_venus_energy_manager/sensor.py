@@ -130,10 +130,10 @@ async def async_setup_entry(
     for definition in AGGREGATE_SENSOR_DEFINITIONS:
         entities.append(MarstekVenusAggregateSensor(coordinators, definition, entry, hass))
 
-    # System alarm sensor — only for v2 batteries (only version with alarm/fault registers)
-    v2_coordinators = [c for c in coordinators if c.battery_version == "v2"]
-    if v2_coordinators:
-        entities.append(SystemAlarmSensor(v2_coordinators))
+    # System alarm sensor — only for batteries that expose alarm/fault registers (v2)
+    alarm_coordinators = [c for c in coordinators if c.capabilities.has_alarm_registers]
+    if alarm_coordinators:
+        entities.append(SystemAlarmSensor(alarm_coordinators))
 
     # Add calculated sensors (efficiency, stored energy, cycle count) per battery
     for coordinator in coordinators:
@@ -145,7 +145,7 @@ async def async_setup_entry(
             entities.append(MarstekVenusCycleSensor(coordinator, definition))
         # DC-coupled PV total + solar-corrected battery power exist only on
         # Venus D/A (units with MPPT registers).
-        if coordinator.battery_version in ("vA", "vD"):
+        if coordinator.capabilities.has_mppt_pv:
             for definition in SOLAR_POWER_SENSOR_DEFINITIONS:
                 entities.append(MarstekVenusSolarPowerSensor(coordinator, definition))
             for definition in BATTERY_CELL_POWER_SENSOR_DEFINITIONS:
@@ -195,7 +195,7 @@ async def async_setup_entry(
     # Daily solar = external solar sensor + Venus DC-coupled PV (MPPT on vA/vD),
     # so it is added when either source exists (decoupled from external config so
     # removing that sensor no longer makes the entity unavailable).
-    has_mppt_pv = any(c.battery_version in ("vA", "vD") for c in coordinators)
+    has_mppt_pv = any(c.capabilities.has_mppt_pv for c in coordinators)
     if controller and (getattr(controller, "solar_production_sensor", None) or has_mppt_pv):
         entities.append(DailySolarEnergySensor(controller))
     # The daily home total is derived from the (always-present) net grid meter:

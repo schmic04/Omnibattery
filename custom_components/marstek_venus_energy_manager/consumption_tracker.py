@@ -301,7 +301,7 @@ class ConsumptionTracker:
         for coordinator in ctrl.coordinators:
             # Skip disconnected units: their MPPT readings go stale (merged dict,
             # never expired) and would inflate the integrated daily solar total.
-            if coordinator.battery_version not in ("vA", "vD"):
+            if not coordinator.capabilities.has_mppt_pv:
                 continue
             if not coordinator.is_available or not coordinator.data:
                 continue

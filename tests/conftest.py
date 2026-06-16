@@ -14,6 +14,8 @@ To opt a future test into loading the integration, request the
 """
 from __future__ import annotations
 
+from custom_components.marstek_venus_energy_manager.drivers import DriverCapabilities
+
 
 class FakeCoordinator:
     """Test double pinned to the real coordinator's public surface.
@@ -60,3 +62,25 @@ class FakeCoordinator:
             )
         for key, default in self._DEFAULTS.items():
             setattr(self, key, kw.get(key, default))
+
+    @property
+    def capabilities(self) -> DriverCapabilities:
+        """Mirror the real coordinator's driver-owned capabilities.
+
+        The real ``coordinator.capabilities`` proxies the Marstek driver, which
+        derives these from the version's register map + entity definitions. The
+        fake reproduces that derivation from ``battery_version`` so capability
+        consumers can be unit-tested without a live driver.
+        """
+        v3_family = self.battery_version in ("v3", "vA", "vD")
+        has_pv = self.battery_version in ("vA", "vD")
+        return DriverCapabilities(
+            hardware_soc_cutoff=not v3_family,
+            has_force_mode=True,
+            push_telemetry=False,
+            max_charge_power_w=self.max_charge_power,
+            max_discharge_power_w=self.max_discharge_power,
+            has_mppt_pv=has_pv,
+            has_alarm_registers=self.battery_version == "v2",
+            has_rs485_control=True,
+        )

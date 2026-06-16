@@ -57,6 +57,19 @@ class DriverCapabilities:
     max_charge_power_w: int
     max_discharge_power_w: int
 
+    # True if the hardware has DC-coupled PV / MPPT inputs (Marstek Venus D/A).
+    # The control layer uses this to decide whether the unit contributes solar
+    # production and needs DC-plane efficiency integration. AC-only models report
+    # False.
+    has_mppt_pv: bool
+
+    # True if the hardware exposes alarm/fault status registers (Marstek v2 only).
+    # Gates the system alarm sensor.
+    has_alarm_registers: bool
+
+    # True if external (RS485/Modbus) control mode can be toggled on this hardware.
+    has_rs485_control: bool
+
 
 @dataclass(frozen=True)
 class SetpointResult:

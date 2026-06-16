@@ -81,16 +81,6 @@ class MarstekModbusDriver(BatteryDriver):
             )
         self._client = client
 
-        # Hardware SOC cut-off registers only exist on v2; v3/vA/vD enforce in
-        # software (REGISTER_MAP carries None for them).
-        self._capabilities = DriverCapabilities(
-            hardware_soc_cutoff=REGISTER_MAP.get(version, {}).get("charging_cutoff_capacity") is not None,
-            has_force_mode=REGISTER_MAP.get(version, {}).get("force_mode") is not None,
-            push_telemetry=False,
-            max_charge_power_w=max_charge_power_w,
-            max_discharge_power_w=max_discharge_power_w,
-        )
-
         # logical key -> (register, data_type, count) for telemetry reads.
         self._telemetry_index: dict[str, tuple[int, str, Optional[int]]] = {}
         for defn in definitions or []:
@@ -102,6 +92,22 @@ class MarstekModbusDriver(BatteryDriver):
                 defn.get("data_type", "uint16"),
                 defn.get("count"),
             )
+
+        # Static capabilities, derived from the register map + the seeded entity
+        # definitions so the control layer never branches on the version string.
+        # Hardware SOC cut-off registers only exist on v2 (v3/vA/vD enforce in
+        # software — REGISTER_MAP carries None). MPPT/PV and alarm registers exist
+        # only when their logical keys are present in this model's definitions.
+        self._capabilities = DriverCapabilities(
+            hardware_soc_cutoff=REGISTER_MAP.get(version, {}).get("charging_cutoff_capacity") is not None,
+            has_force_mode=REGISTER_MAP.get(version, {}).get("force_mode") is not None,
+            push_telemetry=False,
+            max_charge_power_w=max_charge_power_w,
+            max_discharge_power_w=max_discharge_power_w,
+            has_mppt_pv="mppt1_power" in self._telemetry_index,
+            has_alarm_registers="alarm_status" in self._telemetry_index,
+            has_rs485_control=REGISTER_MAP.get(version, {}).get("rs485_control") is not None,
+        )
 
     # --- identity -----------------------------------------------------------
 

@@ -225,6 +225,15 @@ class MarstekVenusDataUpdateCoordinator(DataUpdateCoordinator):
         self.client = self.driver.client
 
     @property
+    def capabilities(self):
+        """Static hardware traits, owned by the driver (see DriverCapabilities).
+
+        The control + entity layers consult these instead of branching on the
+        version string, keeping them device-agnostic.
+        """
+        return self.driver.capabilities
+
+    @property
     def is_available(self) -> bool:
         """Return whether the battery is currently reachable."""
         return self._is_connected and not self._is_shutting_down

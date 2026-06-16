@@ -76,7 +76,7 @@ class MarstekVenusEfficiencySensor(CoordinatorEntity, RestoreEntity, SensorEntit
         # is the ratio of two simultaneous power readings, so unlike a cumulative
         # charge/discharge ratio it has no SoC-endpoint dependence and can't blow
         # up on partial cycles. AC-only models keep the accurate hardware counters.
-        self._integrate_mode = coordinator.battery_version in ("vA", "vD")
+        self._integrate_mode = coordinator.capabilities.has_mppt_pv
         self._mppt_keys = ["mppt1_power", "mppt2_power", "mppt3_power", "mppt4_power"]
         # Energy on each plane, split by direction (kWh), MPPT=0 windows only.
         self._charge_ac_kwh = 0.0      # AC drawn while charging the cells

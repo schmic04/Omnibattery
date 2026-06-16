@@ -77,6 +77,33 @@ def test_capabilities_carry_power_envelope_and_force_mode():
     assert caps.push_telemetry is False
 
 
+def test_mppt_pv_capability_derived_from_definitions():
+    # MPPT/PV presence comes from the seeded entity definitions (Venus D/A),
+    # not the version string.
+    no_pv = _driver("v3", definitions=_DEFS).capabilities
+    assert no_pv.has_mppt_pv is False
+    with_pv = _driver(
+        "vD",
+        definitions=_DEFS + [{"key": "mppt1_power", "register": 33000, "data_type": "uint16"}],
+    ).capabilities
+    assert with_pv.has_mppt_pv is True
+
+
+def test_alarm_registers_capability_derived_from_definitions():
+    no_alarm = _driver("v3", definitions=_DEFS).capabilities
+    assert no_alarm.has_alarm_registers is False
+    with_alarm = _driver(
+        "v2",
+        definitions=_DEFS + [{"key": "alarm_status", "register": 36000, "data_type": "uint32"}],
+    ).capabilities
+    assert with_alarm.has_alarm_registers is True
+
+
+@pytest.mark.parametrize("version", ["v2", "v3", "vA", "vD"])
+def test_rs485_control_capability(version):
+    assert _driver(version).capabilities.has_rs485_control is True
+
+
 # ----------------------------------------------------------------------
 # read_telemetry
 # ----------------------------------------------------------------------

@@ -42,7 +42,7 @@ async def async_setup_entry(
         # software-enforced max/min SOC as live-editable entities. The PD controller
         # already enforces these in software; previously they were only changeable
         # through the options flow.
-        if coordinator.get_register("charging_cutoff_capacity") is None:
+        if not coordinator.capabilities.hardware_soc_cutoff:
             entities.append(MarstekSoftSocLimitNumber(coordinator, "max"))
             entities.append(MarstekSoftSocLimitNumber(coordinator, "min"))
 

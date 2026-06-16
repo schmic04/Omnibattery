@@ -50,7 +50,6 @@ from .const import (
     CONF_SLAVE_ID,
     DEFAULT_SLAVE_ID,
     DEFAULT_VERSION,
-    REGISTER_MAP,
     MAX_POWER_BY_VERSION,
     CONF_PD_KP,
     CONF_PD_KD,
@@ -113,7 +112,7 @@ from .const import (
     DEFAULT_SLOT_SOC_MAX_CEILING,
     MAX_TIME_SLOTS,
 )
-from .modbus_client import MarstekModbusClient
+from .drivers.marstek import MarstekModbusDriver
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -429,37 +428,12 @@ class MarstekVenusConfigFlow(ConfigFlow, domain=DOMAIN):
     async def _test_connection(self, host: str, port: int, version: str = "v2", slave_id: int = DEFAULT_SLAVE_ID) -> bool:
         """Test connection to a Marstek Venus battery using version-specific register."""
         _LOGGER.info("Testing connection to %s:%s (%s) slave %s", host, port, version, slave_id)
-        client = MarstekModbusClient(host, port, slave_id=slave_id)
-        try:
-            connected = await client.async_connect()
-            if not connected:
-                _LOGGER.error("Failed to connect to %s:%s", host, port)
-                return False
-
-            # Test with version-specific SOC register
-            soc_register = REGISTER_MAP.get(version, {}).get("battery_soc")
-            if soc_register is None:
-                _LOGGER.error("Unknown version: %s", version)
-                await client.async_close()
-                return False
-
-            _LOGGER.info("Connected to %s:%s (%s), attempting to read register %d", host, port, version, soc_register)
-            value = await client.async_read_register(soc_register, "uint16")
-            await client.async_close()
-
-            if value is not None:
-                _LOGGER.info("Successfully read from %s:%s (%s), SOC: %s", host, port, version, value)
-                return True
-            else:
-                _LOGGER.error("Failed to read SOC register %d from %s:%s (%s)", soc_register, host, port, version)
-                return False
-        except Exception as e:
-            _LOGGER.error("Connection test exception %s:%s (%s): %s", host, port, version, e)
-            try:
-                await client.async_close()
-            except Exception:
-                pass
-            return False
+        result = await MarstekModbusDriver.probe(host, port, version, slave_id)
+        if result:
+            _LOGGER.info("Successfully connected to %s:%s (%s)", host, port, version)
+        else:
+            _LOGGER.error("Failed to connect or read SOC from %s:%s (%s)", host, port, version)
+        return result
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -1788,10 +1762,6 @@ class OptionsFlowHandler(OptionsFlow):
         close it (under lock) to free the single-connection slot, run the test,
         and reconnect. Marstek firmware only supports one Modbus TCP connection.
         """
-        soc_register = REGISTER_MAP.get(version, {}).get("battery_soc")
-        if soc_register is None:
-            return False
-
         # Check if there's an active coordinator for this host + slave id
         entry_data = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id, {})
         coordinators = entry_data.get("coordinators", [])
@@ -1809,58 +1779,23 @@ class OptionsFlowHandler(OptionsFlow):
             # Hold the lock so polling and control loop wait (no errors/warnings)
             async with existing_coordinator.lock:
                 # Close existing connection to free the single-connection slot
-                await existing_coordinator.client.async_close()
+                await existing_coordinator.driver.close()
                 # Give firmware time to release the connection slot
                 await asyncio.sleep(0.5)
 
-                # Test with a fresh connection
-                test_client = MarstekModbusClient(host, port, slave_id=slave_id)
-                try:
-                    connected = await test_client.async_connect()
-                    if not connected:
-                        _LOGGER.warning("Test connection to %s failed after closing coordinator", host)
-                        await existing_coordinator.client.async_connect()
-                        return False
+                result = await MarstekModbusDriver.probe(host, port, version, slave_id)
+                await asyncio.sleep(0.3)
+                # Always reconnect coordinator, even on failure
+                await existing_coordinator.driver.connect()
 
-                    value = await test_client.async_read_register(
-                        soc_register, "uint16"
-                    )
-                    await test_client.async_close()
-                    await asyncio.sleep(0.3)
-
-                    # Reconnect the coordinator's connection
-                    await existing_coordinator.client.async_connect()
-
-                    _LOGGER.info("Test connection to %s successful (SOC=%s), coordinator reconnected", host, value)
-                    return value is not None
-                except Exception as e:
-                    _LOGGER.warning("Test connection to %s failed with exception: %s", host, e)
-                    try:
-                        await test_client.async_close()
-                    except Exception:
-                        pass
-                    await asyncio.sleep(0.3)
-                    # Always reconnect coordinator, even on error
-                    await existing_coordinator.client.async_connect()
-                    return False
+                if result:
+                    _LOGGER.info("Test connection to %s successful, coordinator reconnected", host)
+                else:
+                    _LOGGER.warning("Test connection to %s failed after closing coordinator", host)
+                return result
         else:
             _LOGGER.info("No existing coordinator for %s - opening new connection", host)
-            # No existing coordinator for this host - open new connection directly
-            client = MarstekModbusClient(host, port, slave_id=slave_id)
-            try:
-                connected = await client.async_connect()
-                if not connected:
-                    return False
-
-                value = await client.async_read_register(soc_register, "uint16")
-                await client.async_close()
-                return value is not None
-            except Exception:
-                try:
-                    await client.async_close()
-                except Exception:
-                    pass
-                return False
+            return await MarstekModbusDriver.probe(host, port, version, slave_id)
 
     async def _save_and_finish(self) -> FlowResult:
         """Merge config_data into existing entry data, save, and reload."""

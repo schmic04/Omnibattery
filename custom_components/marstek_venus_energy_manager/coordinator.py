@@ -117,18 +117,11 @@ class MarstekVenusDataUpdateCoordinator(DataUpdateCoordinator):
         # packet correction; the coordinator and platform setups read the
         # per-platform definition lists back from it (see the passthrough
         # properties below) instead of branching on the version string.
-        # ``self.client`` is kept as a transitional alias for the two remaining
-        # register-level uses: the poll loop's per-battery ``unit_id`` set and the
-        # config-flow connection probe (Phase 6). Telemetry reads (incl. block
-        # reads) and all writes — power, config, and now the entity-write path
-        # (number/select/switch/button via ``write_control``) — route through the
-        # driver. The alias falls out once the probe moves behind the driver.
         self.driver = MarstekModbusDriver(
             self.host, self.port, self.battery_version, self.slave_id,
             max_charge_power_w=self.max_charge_power,
             max_discharge_power_w=self.max_discharge_power,
         )
-        self.client = self.driver.client
 
         # Fast key -> definition lookup so the poll loop can scale each raw value by
         # its definition's scale/precision/state_class. The driver returns raw
@@ -358,9 +351,6 @@ class MarstekVenusDataUpdateCoordinator(DataUpdateCoordinator):
             "force_mode",
             "charging_cutoff_capacity", "discharging_cutoff_capacity",
         })
-
-        # Set client unit ID for this battery
-        self.client.unit_id = self.slave_id
 
         # Track read attempts vs successes for connection health monitoring
         sensors_attempted = 0

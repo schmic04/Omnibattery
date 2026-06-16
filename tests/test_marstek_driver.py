@@ -640,3 +640,67 @@ async def test_standby_propagates_write_failure():
     drv = _driver("v3", client=client)
 
     assert await drv.standby() is False
+
+
+# ----------------------------------------------------------------------
+# probe
+
+
+async def test_probe_returns_true_when_soc_readable(monkeypatch):
+    client = AsyncMock()
+    client.async_connect = AsyncMock(return_value=True)
+    client.async_read_register = AsyncMock(return_value=47)
+    client.async_close = AsyncMock()
+    monkeypatch.setattr(
+        "custom_components.marstek_venus_energy_manager.drivers.marstek.MarstekModbusClient",
+        lambda *a, **kw: client,
+    )
+
+    assert await MarstekModbusDriver.probe("1.2.3.4", 502, "v2") is True
+    client.async_read_register.assert_awaited_once()
+
+
+async def test_probe_returns_false_when_connection_fails(monkeypatch):
+    client = AsyncMock()
+    client.async_connect = AsyncMock(return_value=False)
+    client.async_close = AsyncMock()
+    monkeypatch.setattr(
+        "custom_components.marstek_venus_energy_manager.drivers.marstek.MarstekModbusClient",
+        lambda *a, **kw: client,
+    )
+
+    assert await MarstekModbusDriver.probe("1.2.3.4", 502, "v2") is False
+    client.async_read_register.assert_not_awaited()
+
+
+async def test_probe_returns_false_for_unknown_version():
+    assert await MarstekModbusDriver.probe("1.2.3.4", 502, "v99") is False
+
+
+async def test_probe_returns_false_when_read_returns_none(monkeypatch):
+    client = AsyncMock()
+    client.async_connect = AsyncMock(return_value=True)
+    client.async_read_register = AsyncMock(return_value=None)
+    client.async_close = AsyncMock()
+    monkeypatch.setattr(
+        "custom_components.marstek_venus_energy_manager.drivers.marstek.MarstekModbusClient",
+        lambda *a, **kw: client,
+    )
+
+    assert await MarstekModbusDriver.probe("1.2.3.4", 502, "v3") is False
+
+
+async def test_probe_always_closes_client(monkeypatch):
+    client = AsyncMock()
+    client.async_connect = AsyncMock(return_value=True)
+    client.async_read_register = AsyncMock(side_effect=RuntimeError("boom"))
+    client.async_close = AsyncMock()
+    monkeypatch.setattr(
+        "custom_components.marstek_venus_energy_manager.drivers.marstek.MarstekModbusClient",
+        lambda *a, **kw: client,
+    )
+
+    result = await MarstekModbusDriver.probe("1.2.3.4", 502, "v2")
+
+    assert result is False
+    client.async_close.assert_awaited_once()

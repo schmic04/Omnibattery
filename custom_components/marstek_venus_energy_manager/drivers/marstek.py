@@ -271,12 +271,6 @@ class MarstekModbusDriver(BatteryDriver):
     def all_definitions(self) -> list[dict]:
         return self._definitions["all"]
 
-    @property
-    def client(self) -> MarstekModbusClient:
-        """The underlying Modbus client (transitional: the coordinator still uses
-        register-level primitives directly until the read/write paths migrate)."""
-        return self._client
-
     def get_register(self, key: str) -> Optional[int]:
         """Resolve a logical control-register name for this version, or None."""
         return REGISTER_MAP.get(self._version, {}).get(key)
@@ -340,6 +334,7 @@ class MarstekModbusDriver(BatteryDriver):
         passes one :class:`ReadGroup`'s keys per call, so a block group resolves to
         a single block read and a singleton group to one register read.
         """
+        self._client.unit_id = self._slave_id
         wanted = list(keys) if keys is not None else list(self._telemetry_index)
         pending = set(wanted)
         snapshot: TelemetrySnapshot = {}
@@ -596,3 +591,35 @@ class MarstekModbusDriver(BatteryDriver):
         return await self._client.async_write_register(
             reg, _RS485_ENABLE if enable else _RS485_DISABLE
         )
+
+    @classmethod
+    async def probe(cls, host: str, port: int, version: str, slave_id: int = 1) -> bool:
+        """Test whether a Marstek battery responds at host:port for this version.
+
+        Creates a temporary client, reads the SOC register, then tears it down.
+        Returns True if a value was read, False on any failure (bad version,
+        connection refused, read timeout, etc.). Used by the config / options flow
+        to validate host/port/version before committing them.
+        """
+        soc_register = REGISTER_MAP.get(version, {}).get("battery_soc")
+        if soc_register is None:
+            return False
+        client = MarstekModbusClient(
+            host, port,
+            message_wait_ms=MESSAGE_WAIT_MS.get(version, 50),
+            timeout=READ_TIMEOUT_S.get(version, 10),
+            is_v3=version in _V3_FAMILY,
+            slave_id=slave_id,
+        )
+        try:
+            if not await client.async_connect():
+                return False
+            value = await client.async_read_register(soc_register, "uint16")
+            return value is not None
+        except Exception:
+            return False
+        finally:
+            try:
+                await client.async_close()
+            except Exception:
+                pass

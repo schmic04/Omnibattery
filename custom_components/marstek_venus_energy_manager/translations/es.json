@@ -984,7 +984,7 @@
       "system_daily_home_energy": {
         "name": "Consumo Diario de la Casa"
       },
-      "system_home_consumption": {
+      "home_consumption": {
         "name": "Consumo de la Casa"
       },
       "system_pd_control_quality": {

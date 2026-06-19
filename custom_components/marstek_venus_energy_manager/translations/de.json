@@ -988,7 +988,7 @@
           "collecting_data": "Daten werden gesammelt"
         }
       },
-      "system_home_consumption": {
+      "home_consumption": {
         "name": "Haushaltsverbrauch"
       },
       "system_daily_grid_import_energy": {

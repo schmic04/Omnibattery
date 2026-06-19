@@ -214,7 +214,7 @@ async def _async_register_frontend_panel(hass: HomeAssistant, entry: ConfigEntry
             # Home node = the integration's derived Home Consumption aggregate sensor
             # (grid + battery AC + solar). The dedicated household sensor was removed
             # from the config flow, so the derived sensor is the single home source.
-            panel_config["home_entity"] = "sensor.marstek_venus_system_system_home_consumption"
+            panel_config["home_entity"] = "sensor.marstek_venus_system_home_consumption"
             if data.get(CONF_SOLAR_FORECAST_SENSOR):
                 panel_config["solar_forecast_entity"] = data[CONF_SOLAR_FORECAST_SENSOR]
             # Real-time PV production for the Solar node when panels are not wired
@@ -4332,8 +4332,11 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
               the config flow; home consumption is now always derived (grid +
               battery AC + solar). Leaving it in data let it keep driving consumption
               calculations on old installs.
+    v6 -> v7: fix Home Consumption aggregate sensor unique_id from the incorrect
+              marstek_venus_system_system_home_consumption (double "system") to
+              marstek_venus_system_home_consumption.
     """
-    if entry.version >= 6:
+    if entry.version >= 7:
         return True
 
     new_data = dict(entry.data)
@@ -4434,7 +4437,22 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 "now always derived from grid + battery AC + solar)"
             )
 
-    hass.config_entries.async_update_entry(entry, data=new_data, version=6)
+    if entry.version < 7:
+        from homeassistant.helpers import entity_registry as er
+
+        @callback
+        def _fix_home_consumption_uid(entity_entry):
+            if entity_entry.unique_id == "marstek_venus_system_system_home_consumption":
+                return {"new_unique_id": "marstek_venus_system_home_consumption"}
+            return None
+
+        await er.async_migrate_entries(hass, entry.entry_id, _fix_home_consumption_uid)
+        _LOGGER.info(
+            "Marstek: migrated config entry to version 7 "
+            "(fixed Home Consumption sensor unique_id: removed duplicate 'system' prefix)"
+        )
+
+    hass.config_entries.async_update_entry(entry, data=new_data, version=7)
     return True
 
 

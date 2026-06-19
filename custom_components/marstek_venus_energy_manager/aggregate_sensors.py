@@ -81,7 +81,7 @@ AGGREGATE_SENSOR_DEFINITIONS = [
         "precision": 2,
     },
     {
-        "key": "system_home_consumption",
+        "key": "home_consumption",
         "name": "Home Consumption",
         "unit": "W",
         "device_class": SensorDeviceClass.POWER,
@@ -268,7 +268,7 @@ class MarstekVenusAggregateSensor(SensorEntity):
             return self._calculate_daily_charging_energy()
         elif key == "system_daily_discharging_energy":
             return self._calculate_daily_discharging_energy()
-        elif key == "system_home_consumption":
+        elif key == "home_consumption":
             return self._calculate_home_consumption()
 
         return None

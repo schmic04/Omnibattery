@@ -867,7 +867,7 @@
       "system_daily_home_energy": {
         "name": "Daily Home Consumption"
       },
-      "system_home_consumption": {
+      "home_consumption": {
         "name": "Home Consumption"
       },
       "system_daily_grid_import_energy": {

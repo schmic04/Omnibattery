@@ -932,7 +932,7 @@
           "collecting_data": "Recollint dades"
         }
       },
-      "system_home_consumption": {
+      "home_consumption": {
         "name": "Consum de la Casa"
       },
       "system_daily_grid_import_energy": {

@@ -197,6 +197,7 @@ async def _async_register_frontend_panel(hass: HomeAssistant, entry: ConfigEntry
         panel_config = {"domain": DOMAIN, "title": PANEL_TITLE}
         if entry is not None:
             from .const import (
+                CONF_BATTERY_VERSION,
                 CONF_SOLAR_FORECAST_SENSOR,
                 CONF_SOLAR_PRODUCTION_SENSOR,
             )
@@ -217,9 +218,16 @@ async def _async_register_frontend_panel(hass: HomeAssistant, entry: ConfigEntry
             panel_config["home_entity"] = "sensor.marstek_venus_system_home_consumption"
             if data.get(CONF_SOLAR_FORECAST_SENSOR):
                 panel_config["solar_forecast_entity"] = data[CONF_SOLAR_FORECAST_SENSOR]
-            # Real-time PV production for the Solar node when panels are not wired
-            # through the battery MPPT inputs (external inverter).
-            if data.get(CONF_SOLAR_PRODUCTION_SENSOR):
+            # Solar node click target. When any battery has DC-coupled PV (vA/vD)
+            # the node shows external + MPPT, so link the live total-solar sensor
+            # (sensor.marstek_venus_system_solar_power, gated on MPPT in sensor.py)
+            # which sums both — otherwise clicking would open only the external
+            # inverter and mismatch the displayed total (#391). Non-MPPT systems
+            # never get that sensor, so they keep the external-only link (or none).
+            versions = {b.get(CONF_BATTERY_VERSION) for b in data.get("batteries", [])}
+            if versions & {"vA", "vD"}:
+                panel_config["solar_entity"] = "sensor.marstek_venus_system_solar_power"
+            elif data.get(CONF_SOLAR_PRODUCTION_SENSOR):
                 panel_config["solar_entity"] = data[CONF_SOLAR_PRODUCTION_SENSOR]
 
         # Remove any previous registration so the module URL / config refresh.

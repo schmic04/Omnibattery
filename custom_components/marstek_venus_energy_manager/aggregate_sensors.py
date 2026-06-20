@@ -92,6 +92,21 @@ AGGREGATE_SENSOR_DEFINITIONS = [
 ]
 
 
+# Signed net cell power across all batteries (+charge / -discharge), added only
+# for systems with DC-coupled PV (vA/vD). Mirrors the dashboard's per-battery
+# cell-power formula so the SOC card's Charge/Discharge blocks can link to a value
+# that matches what they display, instead of the AC-only system_charge_power (#347).
+SYSTEM_BATTERY_CELL_POWER_DEFINITION = {
+    "key": "system_battery_cell_power",
+    "name": "System Battery Cell Power",
+    "unit": "W",
+    "device_class": SensorDeviceClass.POWER,
+    "state_class": SensorStateClass.MEASUREMENT,
+    "icon": "mdi:home-battery",
+    "precision": 0,
+}
+
+
 class DailyGridAtMinSocSensor(SensorEntity):
     """Tracks daily grid energy imported when all batteries are at min SOC during a discharge window.
 
@@ -270,8 +285,45 @@ class MarstekVenusAggregateSensor(SensorEntity):
             return self._calculate_daily_discharging_energy()
         elif key == "home_consumption":
             return self._calculate_home_consumption()
+        elif key == "system_battery_cell_power":
+            return self._calculate_battery_cell_power()
 
         return None
+
+    def _calculate_battery_cell_power(self) -> float | None:
+        """Signed net cell power across all batteries (+charge / -discharge).
+
+        Mirrors the dashboard's per-battery cell-power formula exactly, so the SOC
+        card's Charge/Discharge blocks link to a value that matches what they show:
+        ``-ac_power - ac_offgrid_power + sum(MPPT)``. ac_power is preferred over the
+        unreliable battery_power register; drivers without ac_power (no MPPT, so this
+        sensor isn't created for them) fall back to their signed battery_power.
+        """
+        total = 0.0
+        has_data = False
+        for coordinator in self.coordinators:
+            # Disconnected units keep stale ac_power/MPPT (merged dict, never expired).
+            if not (coordinator.is_available and coordinator.data):
+                continue
+            data = coordinator.data
+            ac = data.get("ac_power")
+            if ac is not None:
+                mppt = 0.0
+                for mk in ("mppt1_power", "mppt2_power", "mppt3_power", "mppt4_power"):
+                    value = data.get(mk)
+                    if value is not None:
+                        mppt += value
+                aco = data.get("ac_offgrid_power") or 0.0
+                total += -ac - aco + mppt
+                has_data = True
+            else:
+                battery_power = data.get("battery_power")
+                if battery_power is not None:
+                    total += battery_power
+                    has_data = True
+        if not has_data:
+            return None
+        return round(total, self.definition.get("precision", 0))
 
     def _calculate_system_soc(self) -> float | None:
         """Calculate capacity-weighted SOC across all batteries."""

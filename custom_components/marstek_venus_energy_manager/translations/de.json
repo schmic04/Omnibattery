@@ -910,6 +910,12 @@
       "active_batteries": {
         "name": "Aktive Batterien"
       },
+      "system_battery_cell_power": {
+        "name": "System-Batteriezellenleistung"
+      },
+      "system_solar_power": {
+        "name": "Gesamt-Solarleistung"
+      },
       "system_daily_solar_energy": {
         "name": "Tägliche Solarproduktion"
       },

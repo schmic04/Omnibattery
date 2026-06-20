@@ -441,6 +441,8 @@ const K = {
   sysCapacity: "system_total_energy",
   sysChargePower: "system_charge_power",
   sysDischargePower: "system_discharge_power",
+  sysBattCellPower: "system_battery_cell_power", // signed cell power (AC+MPPT); vA/vD only
+
   sysHomePower: "system_home_consumption", // derived instantaneous home consumption (W)
   sysDailyCharge: "system_daily_charging_energy",
   sysDailyDischarge: "system_daily_discharging_energy",
@@ -1680,8 +1682,12 @@ class MarstekVenusPanel extends HTMLElement {
     this._linkMoreInfo(ring, this._sysEntityId(K.sysSoc));
     this._linkMoreInfo(ring.querySelector(".ring-sub"), this._sysEntityId(K.sysStored));
     const sb = pw.querySelectorAll(".statblock");
-    this._linkMoreInfo(sb[0], this._sysEntityId(K.sysChargePower));
-    this._linkMoreInfo(sb[1], this._sysEntityId(K.sysDischargePower));
+    // On vA/vD the Charge/Discharge blocks show cell power (AC + DC MPPT), so link
+    // the matching signed cell-power sensor when it exists; it's only created for
+    // MPPT systems, so others fall back to the AC-only charge/discharge sensors (#347).
+    const cellId = this._sysEntityId(K.sysBattCellPower);
+    this._linkMoreInfo(sb[0], cellId || this._sysEntityId(K.sysChargePower));
+    this._linkMoreInfo(sb[1], cellId || this._sysEntityId(K.sysDischargePower));
 
     this._r.ringFg = ring.querySelector(".ring-fg");
     this._r.ringCirc = circ;

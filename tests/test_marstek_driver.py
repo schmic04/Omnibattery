@@ -14,11 +14,11 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from custom_components.marstek_venus_energy_manager.drivers import (
+from custom_components.omnibattery.drivers import (
     DriverCapabilities,
     MarstekModbusDriver,
 )
-from custom_components.marstek_venus_energy_manager.const import REGISTER_MAP
+from custom_components.omnibattery.const import REGISTER_MAP
 
 
 def _fake_client():
@@ -51,7 +51,7 @@ def _no_settle(monkeypatch):
         return None
 
     monkeypatch.setattr(
-        "custom_components.marstek_venus_energy_manager.drivers.marstek.asyncio.sleep",
+        "custom_components.omnibattery.drivers.marstek.asyncio.sleep",
         _instant,
     )
 
@@ -119,7 +119,7 @@ def test_rs485_control_capability(version):
 # ----------------------------------------------------------------------
 def test_definitions_loaded_from_version_when_not_injected():
     # Production passes no definitions: the driver loads this version's real set.
-    from custom_components.marstek_venus_energy_manager.const import (
+    from custom_components.omnibattery.const import (
         SENSOR_DEFINITIONS,
         NUMBER_DEFINITIONS,
         SELECT_DEFINITIONS,
@@ -662,7 +662,7 @@ async def test_probe_returns_true_when_soc_readable(monkeypatch):
     client.async_read_register = AsyncMock(return_value=47)
     client.async_close = AsyncMock()
     monkeypatch.setattr(
-        "custom_components.marstek_venus_energy_manager.drivers.marstek.MarstekModbusClient",
+        "custom_components.omnibattery.drivers.marstek.MarstekModbusClient",
         lambda *a, **kw: client,
     )
 
@@ -675,7 +675,7 @@ async def test_probe_returns_false_when_connection_fails(monkeypatch):
     client.async_connect = AsyncMock(return_value=False)
     client.async_close = AsyncMock()
     monkeypatch.setattr(
-        "custom_components.marstek_venus_energy_manager.drivers.marstek.MarstekModbusClient",
+        "custom_components.omnibattery.drivers.marstek.MarstekModbusClient",
         lambda *a, **kw: client,
     )
 
@@ -693,7 +693,7 @@ async def test_probe_returns_false_when_read_returns_none(monkeypatch):
     client.async_read_register = AsyncMock(return_value=None)
     client.async_close = AsyncMock()
     monkeypatch.setattr(
-        "custom_components.marstek_venus_energy_manager.drivers.marstek.MarstekModbusClient",
+        "custom_components.omnibattery.drivers.marstek.MarstekModbusClient",
         lambda *a, **kw: client,
     )
 
@@ -706,7 +706,7 @@ async def test_probe_always_closes_client(monkeypatch):
     client.async_read_register = AsyncMock(side_effect=RuntimeError("boom"))
     client.async_close = AsyncMock()
     monkeypatch.setattr(
-        "custom_components.marstek_venus_energy_manager.drivers.marstek.MarstekModbusClient",
+        "custom_components.omnibattery.drivers.marstek.MarstekModbusClient",
         lambda *a, **kw: client,
     )
 

@@ -9,7 +9,7 @@ string, and a malformed payload falls back rather than resetting to 0.
 """
 from __future__ import annotations
 
-from custom_components.marstek_venus_energy_manager.sensors.calculated_sensors import (
+from custom_components.omnibattery.sensors.calculated_sensors import (
     _SyntheticEnergyData,
 )
 

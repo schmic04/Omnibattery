@@ -20,12 +20,12 @@ from types import SimpleNamespace
 
 from homeassistant.util import dt as dt_util
 
-from custom_components.marstek_venus_energy_manager.const import (
+from custom_components.omnibattery.const import (
     CONF_FULL_CHARGE_VOLTAGE_TAPER_ENABLED,
     NORMAL_BALANCE_CHARGE_POWER_W,
     NORMAL_BALANCE_RECAL_CUTOFF_CYCLES,
 )
-from custom_components.marstek_venus_energy_manager.control.max_soc_charge import (
+from custom_components.omnibattery.control.max_soc_charge import (
     MaxSocChargeManager,
 )
 

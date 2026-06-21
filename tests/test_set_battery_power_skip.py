@@ -16,11 +16,11 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
-from custom_components.marstek_venus_energy_manager import ChargeDischargeController
-from custom_components.marstek_venus_energy_manager.const import (
+from custom_components.omnibattery import ChargeDischargeController
+from custom_components.omnibattery.const import (
     PD_READBACK_EVERY_N_WRITES,
 )
-from custom_components.marstek_venus_energy_manager.drivers import SetpointResult
+from custom_components.omnibattery.drivers import SetpointResult
 from tests.conftest import FakeCoordinator
 
 

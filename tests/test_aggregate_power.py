@@ -5,7 +5,7 @@ Covers System Charge/Discharge Power (Zendure coordinators only synthesise
 System Battery Cell Power (signed, mirroring the dashboard formula
 ``-ac_power - ac_offgrid_power + sum(MPPT)``).
 """
-from custom_components.marstek_venus_energy_manager.sensors.aggregate_sensors import (
+from custom_components.omnibattery.sensors.aggregate_sensors import (
     MarstekVenusAggregateSensor,
 )
 from tests.conftest import FakeCoordinator

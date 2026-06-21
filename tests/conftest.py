@@ -18,7 +18,7 @@ import sys
 
 import pytest
 
-from custom_components.marstek_venus_energy_manager.drivers import DriverCapabilities
+from custom_components.omnibattery.drivers import DriverCapabilities
 
 
 def pytest_configure(config: pytest.Config) -> None:

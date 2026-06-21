@@ -16,15 +16,15 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
-from custom_components.marstek_venus_energy_manager.const import (
+from custom_components.omnibattery.const import (
     PRICE_INTEGRATION_CKW,
     PRICE_INTEGRATION_NORDPOOL,
     PREDICTIVE_MODE_DYNAMIC_PRICING,
     PREDICTIVE_MODE_REALTIME_PRICE,
     PREDICTIVE_MODE_TIME_SLOT,
 )
-from custom_components.marstek_venus_energy_manager.pricing import PriceSlot
-from custom_components.marstek_venus_energy_manager.pricing.engine import PricingManager
+from custom_components.omnibattery.pricing import PriceSlot
+from custom_components.omnibattery.pricing.engine import PricingManager
 
 
 # ----------------------------------------------------------------------

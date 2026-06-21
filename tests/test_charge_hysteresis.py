@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from custom_components.marstek_venus_energy_manager import ChargeDischargeController
+from custom_components.omnibattery import ChargeDischargeController
 
 
 class _Coord:

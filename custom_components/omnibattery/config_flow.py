@@ -28,6 +28,10 @@ from homeassistant.helpers.selector import (
     TextSelectorType,
 )
 
+from .migration_flow import (
+    LegacyDomainMigrationMixin,
+    async_has_legacy_entries,
+)
 from .const import (
     DOMAIN,
     CONF_ENABLE_PREDICTIVE_CHARGING,
@@ -416,8 +420,8 @@ def _finalize_slot(step_a: dict, step_b: dict | None) -> dict:
     }
 
 
-class MarstekVenusConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Marstek Venus Energy Manager."""
+class MarstekVenusConfigFlow(LegacyDomainMigrationMixin, ConfigFlow, domain=DOMAIN):
+    """Handle a config flow for Omnibattery."""
 
     VERSION = 8
 
@@ -454,6 +458,13 @@ class MarstekVenusConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Step 1: Ask for the consumption sensor and optional solar forecast sensor."""
+        # Rebrand migration: a HACS domain rename leaves the legacy
+        # marstek_venus_energy_manager config entries in .storage. The new domain
+        # starts with zero entries, so the config flow is the only entry point HA
+        # exposes — route to the seamless migration before any fresh setup.
+        if async_has_legacy_entries(self.hass):
+            return await self.async_step_migrate_legacy()
+
         errors = {}
 
         if user_input is not None:

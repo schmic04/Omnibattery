@@ -13,10 +13,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from custom_components.marstek_venus_energy_manager.const import (
+from custom_components.omnibattery.const import (
     DEFAULT_BASE_CONSUMPTION_KWH,
 )
-from custom_components.marstek_venus_energy_manager.tracking.consumption_tracker import (
+from custom_components.omnibattery.tracking.consumption_tracker import (
     ConsumptionTracker,
 )
 from tests.conftest import FakeCoordinator

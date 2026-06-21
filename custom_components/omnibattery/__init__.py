@@ -145,9 +145,9 @@ PLATFORMS: list[Platform] = [
 ]
 
 # Sidebar dashboard panel served with the integration.
-PANEL_URL_PATH = "marstek-venus"
-PANEL_STATIC_PATH = "/marstek_venus_energy_manager_static"
-PANEL_TITLE = "Marstek Venus"
+PANEL_URL_PATH = "omnibattery"
+PANEL_STATIC_PATH = "/omnibattery_static"
+PANEL_TITLE = "Omnibattery"
 PANEL_ICON = "mdi:home-battery"
 _PANEL_REGISTERED_KEY = "_panel_registered"
 _STATIC_REGISTERED_KEY = "_panel_static_registered"

@@ -34,10 +34,10 @@ from pytest_homeassistant_custom_component.common import (
     mock_platform,
 )
 
-from custom_components.marstek_venus_energy_manager.domain_migration import (
+from custom_components.omnibattery.domain_migration import (
     async_migrate_legacy_domain_entries,
 )
-from custom_components.marstek_venus_energy_manager.migration_flow import (
+from custom_components.omnibattery.migration_flow import (
     LegacyDomainMigrationMixin,
     async_has_legacy_entries,
 )
@@ -192,6 +192,49 @@ async def test_migration_is_seamless(hass: HomeAssistant, _flow_handlers) -> Non
     assert custom.area_id == area.id
     # statistic_id == entity_id, and entity_id is unchanged above, so long-term
     # statistics_meta stays attached without simulating the recorder here.
+
+
+async def test_migration_carries_storage_files(
+    hass: HomeAssistant, _flow_handlers
+) -> None:
+    """The integration's .storage Store files follow the rebrand.
+
+    Daily energy / accumulators / history are persisted in Store files keyed by
+    ``{domain}.{entry_id}`` (plus a domain-only consumption history). Both the
+    domain and entry_id change, so the helper must copy them — otherwise the new
+    entry resets every persisted counter (the dashboard's "energy today" totals).
+    """
+    import json
+    import os
+
+    old_entry = await _setup_old_entry(hass)
+    storage_dir = hass.config.path(".storage")
+    os.makedirs(storage_dir, exist_ok=True)
+
+    per_entry_old = f"{OLD_DOMAIN}.{old_entry.entry_id}.daily_energy"
+    domain_old = f"{OLD_DOMAIN}_consumption_history"
+    with open(os.path.join(storage_dir, per_entry_old), "w", encoding="utf-8") as fh:
+        json.dump(
+            {"version": 1, "key": per_entry_old,
+             "data": {"date": "2026-06-21", "home_kwh": 8.0}}, fh
+        )
+    with open(os.path.join(storage_dir, domain_old), "w", encoding="utf-8") as fh:
+        json.dump({"version": 1, "key": domain_old, "data": {"history": [1, 2, 3]}}, fh)
+
+    migrated = await async_migrate_legacy_domain_entries(hass, OLD_DOMAIN, NEW_DOMAIN)
+    await hass.async_block_till_done()
+    _old_id, new_id = migrated[0]
+
+    per_entry_new = os.path.join(storage_dir, f"{NEW_DOMAIN}.{new_id}.daily_energy")
+    domain_new = os.path.join(storage_dir, f"{NEW_DOMAIN}_consumption_history")
+    assert os.path.exists(per_entry_new)
+    assert os.path.exists(domain_new)
+
+    with open(per_entry_new, encoding="utf-8") as fh:
+        moved = json.load(fh)
+    # data preserved verbatim; the embedded key is rewritten to the new filename.
+    assert moved["data"] == {"date": "2026-06-21", "home_kwh": 8.0}
+    assert moved["key"] == f"{NEW_DOMAIN}.{new_id}.daily_energy"
 
 
 async def test_restored_unavailable_state_blocks_raw_migration(

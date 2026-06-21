@@ -17,8 +17,8 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 
-from custom_components.marstek_venus_energy_manager import async_migrate_entry
-from custom_components.marstek_venus_energy_manager.const import (
+from custom_components.omnibattery import async_migrate_entry
+from custom_components.omnibattery.const import (
     MIN_CHARGE_HYSTERESIS_PERCENT,
 )
 

@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from custom_components.marstek_venus_energy_manager.drivers.zendure import (
+from custom_components.omnibattery.drivers.zendure import (
     NUMBER_DEFINITIONS,
     SELECT_DEFINITIONS,
     SENSOR_DEFINITIONS,
@@ -111,7 +111,7 @@ def _driver(
 def _no_settle(monkeypatch):
     """Skip the 0.5 s post-write settle so readback tests stay fast."""
     monkeypatch.setattr(
-        "custom_components.marstek_venus_energy_manager.drivers.zendure.asyncio.sleep",
+        "custom_components.omnibattery.drivers.zendure.asyncio.sleep",
         AsyncMock(return_value=None),
     )
 
@@ -630,7 +630,7 @@ def _probe_session(status: int = 200, data: dict | None = None) -> MagicMock:
 async def test_probe_returns_true_when_properties_present(monkeypatch):
     fake = _probe_session(200, {"properties": {"electricLevel": 80}})
     monkeypatch.setattr(
-        "custom_components.marstek_venus_energy_manager.drivers.zendure.aiohttp.ClientSession",
+        "custom_components.omnibattery.drivers.zendure.aiohttp.ClientSession",
         MagicMock(return_value=fake),
     )
     assert await ZendureLocalDriver.probe("192.168.1.100") is True
@@ -639,7 +639,7 @@ async def test_probe_returns_true_when_properties_present(monkeypatch):
 async def test_probe_returns_false_on_http_error(monkeypatch):
     fake = _probe_session(404)
     monkeypatch.setattr(
-        "custom_components.marstek_venus_energy_manager.drivers.zendure.aiohttp.ClientSession",
+        "custom_components.omnibattery.drivers.zendure.aiohttp.ClientSession",
         MagicMock(return_value=fake),
     )
     assert await ZendureLocalDriver.probe("192.168.1.100") is False
@@ -648,7 +648,7 @@ async def test_probe_returns_false_on_http_error(monkeypatch):
 async def test_probe_returns_false_when_properties_key_missing(monkeypatch):
     fake = _probe_session(200, {"sn": "ZB1", "status": "ok"})
     monkeypatch.setattr(
-        "custom_components.marstek_venus_energy_manager.drivers.zendure.aiohttp.ClientSession",
+        "custom_components.omnibattery.drivers.zendure.aiohttp.ClientSession",
         MagicMock(return_value=fake),
     )
     assert await ZendureLocalDriver.probe("192.168.1.100") is False
@@ -662,7 +662,7 @@ async def test_probe_returns_false_on_exception(monkeypatch):
     fake.__aexit__ = AsyncMock(return_value=False)
     fake.get = MagicMock(side_effect=asyncio.TimeoutError)
     monkeypatch.setattr(
-        "custom_components.marstek_venus_energy_manager.drivers.zendure.aiohttp.ClientSession",
+        "custom_components.omnibattery.drivers.zendure.aiohttp.ClientSession",
         MagicMock(return_value=fake),
     )
     assert await ZendureLocalDriver.probe("192.168.1.100") is False

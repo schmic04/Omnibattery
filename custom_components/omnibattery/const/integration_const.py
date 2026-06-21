@@ -1,6 +1,6 @@
 """Integration-level configuration constants for the Marstek Venus Energy Manager."""
 
-DOMAIN = "marstek_venus_energy_manager"
+DOMAIN = "omnibattery"
 
 # Prefix for every persistent_notification this integration creates/dismisses.
 # Lets automations (e.g. the Telegram-forwarding blueprint) reliably select only

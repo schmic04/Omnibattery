@@ -12,8 +12,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-from custom_components.marstek_venus_energy_manager.const import CHARGE_EFFICIENCY
-from custom_components.marstek_venus_energy_manager.pricing import (
+from custom_components.omnibattery.const import CHARGE_EFFICIENCY
+from custom_components.omnibattery.pricing import (
     PriceSlot,
     calculations,
 )

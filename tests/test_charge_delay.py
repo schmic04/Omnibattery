@@ -13,10 +13,10 @@ from __future__ import annotations
 from datetime import date
 from types import SimpleNamespace
 
-from custom_components.marstek_venus_energy_manager.control.charge_delay import (
+from custom_components.omnibattery.control.charge_delay import (
     ChargeDelayManager,
 )
-from custom_components.marstek_venus_energy_manager.const import (
+from custom_components.omnibattery.const import (
     DELAY_SOC_SETPOINT_HYSTERESIS,
 )
 

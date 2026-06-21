@@ -1,6 +1,6 @@
 {
-  "domain": "marstek_venus_energy_manager",
-  "name": "Marstek Venus Energy Manager",
+  "domain": "omnibattery",
+  "name": "Omnibattery",
   "after_dependencies": [
     "recorder"
   ],
@@ -20,7 +20,7 @@
   "requirements": [
     "pymodbus>=3.5.0"
   ],
-  "version": "2.0.5",
+  "version": "3.0.0",
   "zeroconf": [
     "_modbus._tcp.local."
   ]

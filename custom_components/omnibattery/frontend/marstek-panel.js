@@ -28,8 +28,8 @@
  * animation and ring transitions never restart.
  */
 
-const FALLBACK_DOMAIN = "marstek_venus_energy_manager";
-const FALLBACK_TITLE = "Marstek Venus";
+const FALLBACK_DOMAIN = "omnibattery";
+const FALLBACK_TITLE = "Omnibattery";
 
 // --- i18n ------------------------------------------------------------------
 // All user-facing panel strings, keyed by a stable id and resolved at render

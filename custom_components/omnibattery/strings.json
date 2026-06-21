@@ -1,6 +1,10 @@
 {
   "config": {
     "step": {
+      "migrate_legacy": {
+        "title": "Migrate from Marstek Venus",
+        "description": "Found {count} existing Marstek Venus configuration(s). Migrating to Omnibattery keeps all your entities, history and settings intact. Continue?"
+      },
       "user": {
         "title": "Configure Marstek Venus Energy Manager",
         "description": "Select the sensor that measures grid import/export power. Optionally, configure the solar forecast sensor for advanced features.",
@@ -443,7 +447,9 @@
     },
     "abort": {
       "already_configured": "This integration is already configured.",
-      "reconfigure_successful": "Battery connection settings updated successfully."
+      "reconfigure_successful": "Battery connection settings updated successfully.",
+      "no_legacy_entries": "No legacy Marstek Venus configuration was found to migrate.",
+      "migration_successful": "Migrated {count} configuration(s) to Omnibattery. Your entities, history and settings were preserved."
     }
   },
   "options": {

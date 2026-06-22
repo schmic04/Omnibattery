@@ -55,6 +55,9 @@ class WeeklyFullChargeManager:
         self._store = Store(hass, 1, f"{DOMAIN}.{config_entry.entry_id}.weekly_charge_state")
         # Per-battery debounce counter for BMS-cutoff detection (in-memory only).
         self._bms_cutoff_counts: dict[str, int] = {}
+        # Edge-trigger guard so the "already completed" debug line logs once per
+        # completion, not once per is_active() call (called per-battery per-cycle).
+        self._already_complete_logged = False
 
     @property
     def store(self) -> Store:
@@ -151,6 +154,11 @@ class WeeklyFullChargeManager:
         if not ctrl.weekly_full_charge_enabled:
             return False
 
+        # Re-arm the "already completed" edge-trigger log whenever completion clears
+        # (day boundary, feature toggle, force-charge reset — wherever it happens).
+        if not ctrl.weekly_full_charge_complete:
+            self._already_complete_logged = False
+
         now = datetime.now()
         current_weekday = now.weekday()
         target_weekday = WEEKDAY_MAP[ctrl.weekly_full_charge_day]
@@ -185,7 +193,9 @@ class WeeklyFullChargeManager:
             return False
 
         if ctrl.weekly_full_charge_complete:
-            _LOGGER.debug("Weekly Full Charge: On target day but already completed - using normal max_soc")
+            if not self._already_complete_logged:
+                _LOGGER.debug("Weekly Full Charge: On target day but already completed - using normal max_soc")
+                self._already_complete_logged = True
             return False
 
         # Active: on target day and not yet complete

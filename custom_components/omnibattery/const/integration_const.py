@@ -118,6 +118,14 @@ DEFAULT_PREDICTIVE_SAFETY_MARGIN_KWH = 0.0  # kWh added to consumption forecast;
 CONF_PREDICTIVE_GRID_CHARGE_MARGIN_PCT = "predictive_grid_charge_margin_pct"
 DEFAULT_PREDICTIVE_GRID_CHARGE_MARGIN_PCT = 0.0
 
+# Guaranteed minimum SOC floor (#417)
+# The whole-day energy balance can read zero deficit on a solar-positive day,
+# yet the battery still hits the hardware floor in the morning before solar
+# ramps up. This forces a charge sized to reach the floor SOC regardless of the
+# daily balance. 0 = disabled.
+CONF_PREDICTIVE_MIN_SOC_FLOOR = "predictive_min_soc_floor"
+DEFAULT_PREDICTIVE_MIN_SOC_FLOOR = 0.0
+
 # Re-evaluation thresholds
 SOC_REEVALUATION_THRESHOLD = 30  # Re-evaluate every 30% SOC drop
 
@@ -658,6 +666,17 @@ CONFIG_NUMBER_DEFINITIONS = [
         "unit": "%",
         "default": DEFAULT_PREDICTIVE_GRID_CHARGE_MARGIN_PCT,
         "icon": "mdi:transmission-tower-import",
+        "condition": CONF_ENABLE_PREDICTIVE_CHARGING,
+    },
+    {
+        "key": CONF_PREDICTIVE_MIN_SOC_FLOOR,
+        "name": "Guaranteed Minimum SOC",
+        "min": 0.0,
+        "max": 90.0,
+        "step": 5.0,
+        "unit": "%",
+        "default": DEFAULT_PREDICTIVE_MIN_SOC_FLOOR,
+        "icon": "mdi:battery-arrow-up",
         "condition": CONF_ENABLE_PREDICTIVE_CHARGING,
     },
 ]

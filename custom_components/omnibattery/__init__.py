@@ -106,6 +106,8 @@ from .const import (
     DEFAULT_PREDICTIVE_SAFETY_MARGIN_KWH,
     CONF_PREDICTIVE_GRID_CHARGE_MARGIN_PCT,
     DEFAULT_PREDICTIVE_GRID_CHARGE_MARGIN_PCT,
+    CONF_PREDICTIVE_MIN_SOC_FLOOR,
+    DEFAULT_PREDICTIVE_MIN_SOC_FLOOR,
     CONF_ENABLE_HOURLY_BALANCE,
     CONF_HOURLY_BALANCE_TARGET_NET_WH,
     CONF_HOURLY_BALANCE_MAX_OFFSET_W,
@@ -606,6 +608,7 @@ class ChargeDischargeController:
         self._balance_monitor_enabled = True
         self._predictive_safety_margin_kwh: float = config_entry.data.get(CONF_PREDICTIVE_SAFETY_MARGIN_KWH, DEFAULT_PREDICTIVE_SAFETY_MARGIN_KWH)
         self._predictive_grid_charge_margin_pct: float = config_entry.data.get(CONF_PREDICTIVE_GRID_CHARGE_MARGIN_PCT, DEFAULT_PREDICTIVE_GRID_CHARGE_MARGIN_PCT)
+        self._predictive_min_soc_floor: float = config_entry.data.get(CONF_PREDICTIVE_MIN_SOC_FLOOR, DEFAULT_PREDICTIVE_MIN_SOC_FLOOR)
         self._charge_delay_unlocked = False       # True when delay has been unlocked today
         self._delay_setpoint_reached = False      # True once SOC first reached the setpoint
         self._charge_delay_mgr = ChargeDelayManager(hass, config_entry, self)
@@ -1025,6 +1028,7 @@ class ChargeDischargeController:
         self._balance_monitor_enabled = True
         self._predictive_safety_margin_kwh = self.config_entry.data.get(CONF_PREDICTIVE_SAFETY_MARGIN_KWH, DEFAULT_PREDICTIVE_SAFETY_MARGIN_KWH)
         self._predictive_grid_charge_margin_pct = self.config_entry.data.get(CONF_PREDICTIVE_GRID_CHARGE_MARGIN_PCT, DEFAULT_PREDICTIVE_GRID_CHARGE_MARGIN_PCT)
+        self._predictive_min_soc_floor = self.config_entry.data.get(CONF_PREDICTIVE_MIN_SOC_FLOOR, DEFAULT_PREDICTIVE_MIN_SOC_FLOOR)
         self._charge_delay_status["soc_setpoint"] = self._delay_soc_setpoint if self._delay_soc_setpoint_enabled else None
         self.charge_delay_enabled = self.config_entry.data.get(
             CONF_ENABLE_CHARGE_DELAY,
@@ -2411,6 +2415,17 @@ class ChargeDischargeController:
         # Guardrail: never exceed total system capacity.
         safety_margin_kwh = min(self._predictive_safety_margin_kwh, total_capacity_kwh)
 
+        # Guaranteed minimum SOC floor (#417): the whole-day balance can read
+        # zero deficit on a solar-positive day, yet the battery still hits the
+        # hardware floor in the morning before solar ramps up. If avg SOC is
+        # below the user's floor, force a deficit sized to reach it so the
+        # scheduler charges regardless of the daily balance. Applied via max()
+        # at each deficit branch below; flows through to the per-battery target
+        # SOC and the dynamic-pricing slot sizing unchanged. 0 = disabled.
+        floor_deficit_kwh = 0.0
+        if self._predictive_min_soc_floor > 0 and avg_soc < self._predictive_min_soc_floor:
+            floor_deficit_kwh = (self._predictive_min_soc_floor - avg_soc) / 100.0 * total_capacity_kwh
+
         # Get dynamic consumption forecast
         avg_consumption_kwh = await self._consumption_tracker.get_dynamic_base_consumption()
         days_in_history = len(self._daily_consumption_history)
@@ -2422,7 +2437,7 @@ class ChargeDischargeController:
         if forecast_state is None or forecast_state.state in ("unknown", "unavailable"):
             # Conservative mode: assume zero solar, compare usable vs consumption
             total_available_kwh = usable_energy_kwh
-            energy_deficit_kwh = avg_consumption_kwh + safety_margin_kwh - total_available_kwh
+            energy_deficit_kwh = max(avg_consumption_kwh + safety_margin_kwh - total_available_kwh, floor_deficit_kwh)
             should_charge = energy_deficit_kwh > 0
 
             _LOGGER.warning(
@@ -2457,7 +2472,7 @@ class ChargeDischargeController:
         except (ValueError, TypeError):
             # Treat invalid as unavailable - use same conservative logic
             total_available_kwh = usable_energy_kwh
-            energy_deficit_kwh = avg_consumption_kwh + safety_margin_kwh - total_available_kwh
+            energy_deficit_kwh = max(avg_consumption_kwh + safety_margin_kwh - total_available_kwh, floor_deficit_kwh)
             should_charge = energy_deficit_kwh > 0
 
             _LOGGER.error(
@@ -2489,8 +2504,10 @@ class ChargeDischargeController:
 
         # === STEP 6: Calculate Energy Balance and Decide ===
         total_available_kwh = usable_energy_kwh + solar_forecast_kwh
-        energy_deficit_kwh = avg_consumption_kwh + safety_margin_kwh - total_available_kwh
+        base_deficit_kwh = avg_consumption_kwh + safety_margin_kwh - total_available_kwh
+        energy_deficit_kwh = max(base_deficit_kwh, floor_deficit_kwh)
         should_charge = energy_deficit_kwh > 0
+        floor_active = floor_deficit_kwh > 0 and floor_deficit_kwh > base_deficit_kwh
 
         _LOGGER.info(
             "Predictive Grid Charging Evaluation (Energy Balance):\n"
@@ -2547,6 +2564,9 @@ class ChargeDischargeController:
             "grid_charge_kwh": grid_charge_kwh,
             "consumption_source": "derived (grid + battery AC + solar)",
             "reason": (
+                f"Guaranteed minimum SOC: charging {energy_deficit_kwh:.2f} kWh "
+                f"to reach {self._predictive_min_soc_floor:.0f}% (current avg {avg_soc:.0f}%)"
+                if floor_active else
                 f"Energy deficit: {energy_deficit_kwh:.2f} kWh "
                 f"(available: {total_available_kwh:.2f} kWh < consumption: {avg_consumption_kwh:.2f} kWh"
                 + (f" + margin: {safety_margin_kwh:.2f} kWh" if safety_margin_kwh > 0 else "") + ")"

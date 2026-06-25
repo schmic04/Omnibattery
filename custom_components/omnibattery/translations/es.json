@@ -1444,6 +1444,9 @@
       "predictive_grid_charge_margin_pct": {
         "name": "Margen de Carga de Red Predictiva"
       },
+      "predictive_min_soc_floor": {
+        "name": "SOC mínimo garantizado"
+      },
       "soc_set": {
         "name": "SOC Objetivo"
       },

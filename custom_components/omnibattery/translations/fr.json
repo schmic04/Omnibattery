@@ -1441,6 +1441,9 @@
       "predictive_grid_charge_margin_pct": {
         "name": "Marge de Charge Réseau Prédictive"
       },
+      "predictive_min_soc_floor": {
+        "name": "SOC minimum garanti"
+      },
       "battery_capacity": {
         "name": "Capacité de la Batterie"
       },

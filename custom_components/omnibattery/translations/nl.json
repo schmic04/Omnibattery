@@ -1441,6 +1441,9 @@
       "predictive_grid_charge_margin_pct": {
         "name": "Voorspellende Netladingsmarge"
       },
+      "predictive_min_soc_floor": {
+        "name": "Gegarandeerde minimale SOC"
+      },
       "battery_capacity": {
         "name": "Batterijcapaciteit"
       },

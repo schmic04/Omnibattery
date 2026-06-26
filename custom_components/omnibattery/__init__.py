@@ -480,7 +480,12 @@ class ChargeDischargeController:
         
         # Predictive Grid Charging state
         self.predictive_charging_enabled = config_entry.data.get(CONF_ENABLE_PREDICTIVE_CHARGING, False)
-        self.charging_time_slot = config_entry.data.get(CONF_CHARGING_TIME_SLOT, None)
+        # Predictive charging windows: list of {start_time, end_time, days} dicts.
+        # Legacy configs stored a single dict — normalize to a one-element list.
+        _raw_slots = config_entry.data.get(CONF_CHARGING_TIME_SLOT, None)
+        if isinstance(_raw_slots, dict):
+            _raw_slots = [_raw_slots]
+        self.charging_time_slots = _raw_slots or []
         self.solar_forecast_sensor = config_entry.data.get(CONF_SOLAR_FORECAST_SENSOR, None)
         self.solar_production_sensor = config_entry.data.get(CONF_SOLAR_PRODUCTION_SENSOR, None)
         self.max_contracted_power = config_entry.data.get(CONF_MAX_CONTRACTED_POWER, 7000)
@@ -2597,37 +2602,57 @@ class ChargeDischargeController:
             )
         }
 
-    def _check_time_window(self) -> bool:
-        """Helper to check if we're in the time window (without override check)."""
+    @staticmethod
+    def _time_in_window(t, start, end) -> bool:
+        """True if t falls in [start, end], handling overnight (start > end) windows."""
+        if start <= end:
+            return start <= t <= end
+        return t >= start or t <= end
+
+    def _slots_for_day(self, day_name: str):
+        """(start, end) dt_time pairs for charging windows active on the given weekday."""
+        from datetime import time as dt_time
+        pairs = []
+        for slot in self.charging_time_slots:
+            if day_name not in slot.get("days", []):
+                continue
+            try:
+                pairs.append((
+                    dt_time.fromisoformat(slot["start_time"]),
+                    dt_time.fromisoformat(slot["end_time"]),
+                ))
+            except Exception as e:
+                _LOGGER.error("Error parsing predictive charging time slot: %s", e)
+        return pairs
+
+    def _active_charging_slot(self):
+        """Return the charging window dict we are currently inside, or None."""
         from datetime import datetime, time as dt_time
-        
         now = datetime.now()
         current_time = now.time()
         current_day = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"][now.weekday()]
-        
-        # Check day
-        if current_day not in self.charging_time_slot["days"]:
-            return False
-        
-        # Check time
-        try:
-            start_time = dt_time.fromisoformat(self.charging_time_slot["start_time"])
-            end_time = dt_time.fromisoformat(self.charging_time_slot["end_time"])
-        except Exception as e:
-            _LOGGER.error("Error parsing predictive charging time slot: %s", e)
-            return False
-        
-        # Handle overnight slots
-        if start_time <= end_time:
-            return start_time <= current_time <= end_time
-        else:
-            return current_time >= start_time or current_time <= end_time
-    
+        for slot in self.charging_time_slots:
+            if current_day not in slot.get("days", []):
+                continue
+            try:
+                start_time = dt_time.fromisoformat(slot["start_time"])
+                end_time = dt_time.fromisoformat(slot["end_time"])
+            except Exception as e:
+                _LOGGER.error("Error parsing predictive charging time slot: %s", e)
+                continue
+            if self._time_in_window(current_time, start_time, end_time):
+                return slot
+        return None
+
+    def _check_time_window(self) -> bool:
+        """True if now falls inside any configured charging window (respecting per-window days)."""
+        return self._active_charging_slot() is not None
+
 
 
     def _is_in_predictive_charging_slot(self) -> bool:
         """Check if we're currently within the predictive charging time slot."""
-        if not self.predictive_charging_enabled or self.charging_time_slot is None:
+        if not self.predictive_charging_enabled or not self.charging_time_slots:
             return False
 
         # Check manual override

@@ -1005,7 +1005,7 @@ class PricingManager:
         """Handle predictive charging in time slot mode (extracted from main loop)."""
         # Check if we're in the actual time slot
         in_time_window = (
-            self._controller.charging_time_slot is not None and
+            bool(self._controller.charging_time_slots) and
             self._controller._check_time_window()
         )
 
@@ -1102,7 +1102,7 @@ class PricingManager:
             is_daily_evaluation,
             max_contracted_power=self._controller.max_contracted_power,
             max_charge_capacity=self._controller.max_charge_capacity,
-            charging_time_slot=self._controller.charging_time_slot,
+            charging_time_slot=self._controller._active_charging_slot(),
         )
 
         # Send the notification

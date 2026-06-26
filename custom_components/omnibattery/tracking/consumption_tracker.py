@@ -33,6 +33,38 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
+def _merge_window_hours(slots) -> list[list[float]]:
+    """Charging windows → merged, non-overlapping [start_h, end_h] intervals in [0, 24].
+
+    Day-agnostic union (matches the original single-slot hour math, which ignored
+    days). Overnight windows (start > end) are split at midnight before merging.
+    """
+    subs: list[tuple[float, float]] = []
+    for slot in slots:
+        try:
+            s = dt_time.fromisoformat(slot["start_time"])
+            e = dt_time.fromisoformat(slot["end_time"])
+        except Exception:
+            continue
+        s_h = s.hour + s.minute / 60.0
+        e_h = e.hour + e.minute / 60.0
+        if s_h <= e_h:
+            subs.append((s_h, e_h))
+        else:
+            subs.append((s_h, 24.0))
+            subs.append((0.0, e_h))
+    if not subs:
+        return []
+    subs.sort()
+    merged = [list(subs[0])]
+    for a, b in subs[1:]:
+        if a <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], b)
+        else:
+            merged.append([a, b])
+    return merged
+
+
 class ConsumptionTracker:
     """Manages consumption history, accumulators and solar timing."""
 
@@ -546,10 +578,11 @@ class ConsumptionTracker:
         if not source_entity:
             return None
 
-        # Skip days that are not covered by the charging slot (battery doesn't operate those days)
-        if ctrl.charging_time_slot:
-            day_names = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
-            if day_names[target_date.weekday()] not in ctrl.charging_time_slot.get("days", []):
+        day_names = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+        day_name = day_names[target_date.weekday()]
+        # Skip days not covered by any charging window (battery doesn't operate those days)
+        if ctrl.charging_time_slots:
+            if not any(day_name in s.get("days", []) for s in ctrl.charging_time_slots):
                 _LOGGER.debug("Household backfill: skipping %s (not a slot day)", target_date)
                 return None
 
@@ -563,26 +596,15 @@ class ConsumptionTracker:
         start_time = datetime.combine(target_date, datetime.min.time()).replace(tzinfo=local_tz)
         end_time = datetime.combine(target_date, datetime.max.time()).replace(tzinfo=local_tz)
 
-        # Parse charging_time_slot boundaries (if configured)
-        slot_start: Optional[dt_time] = None
-        slot_end: Optional[dt_time] = None
-        if ctrl.charging_time_slot:
-            try:
-                slot_start = dt_time.fromisoformat(ctrl.charging_time_slot["start_time"])
-                slot_end = dt_time.fromisoformat(ctrl.charging_time_slot["end_time"])
-            except Exception:
-                pass
+        # Charging windows active on the target weekday (per-window days respected)
+        day_intervals = ctrl._slots_for_day(day_name)
 
         def _in_consumption_window(ts: datetime) -> bool:
-            """True when ts is outside the charging_time_slot."""
-            if slot_start is None or slot_end is None:
+            """True when ts falls outside every charging window active that day."""
+            if not day_intervals:
                 return True
             t = ts.time().replace(tzinfo=None)
-            if slot_start <= slot_end:
-                in_slot = slot_start <= t <= slot_end
-            else:
-                in_slot = t >= slot_start or t <= slot_end
-            return not in_slot
+            return not any(ctrl._time_in_window(t, s, e) for s, e in day_intervals)
 
         try:
             recorder_instance = get_instance(self._hass)
@@ -1097,14 +1119,14 @@ class ConsumptionTracker:
         On days covered by the slot, return True only during the hours outside the slot.
         """
         ctrl = self._controller
-        if not ctrl.charging_time_slot:
+        if not ctrl.charging_time_slots:
             return True
 
         now = datetime.now()
         current_day = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"][now.weekday()]
 
-        # Battery only operates on days covered by the charging slot
-        if current_day not in ctrl.charging_time_slot["days"]:
+        # Battery only operates on days covered by at least one charging window
+        if not any(current_day in s.get("days", []) for s in ctrl.charging_time_slots):
             return False
 
         return not ctrl._check_time_window()
@@ -1116,17 +1138,10 @@ class ConsumptionTracker:
         24h minus the slot duration. Used to prorate avg_consumption against the
         portion of the day still ahead in the charge-delay energy balance check.
         """
-        slot = self._controller.charging_time_slot
-        if not slot:
+        slots = self._controller.charging_time_slots
+        if not slots:
             return 24.0
-        try:
-            start = dt_time.fromisoformat(slot["start_time"])
-            end = dt_time.fromisoformat(slot["end_time"])
-        except Exception:
-            return 24.0
-        start_h = start.hour + start.minute / 60.0
-        end_h = end.hour + end.minute / 60.0
-        slot_h = (end_h - start_h) % 24
+        slot_h = sum(b - a for a, b in _merge_window_hours(slots))
         return max(0.0, 24.0 - slot_h)
 
     def consumption_window_hours_in_range(self, from_h: float, to_h: float) -> float:
@@ -1137,20 +1152,12 @@ class ConsumptionTracker:
         """
         if to_h <= from_h:
             return 0.0
-        slot = self._controller.charging_time_slot
-        if not slot:
+        slots = self._controller.charging_time_slots
+        if not slots:
             return to_h - from_h
-        try:
-            s = dt_time.fromisoformat(slot["start_time"])
-            e = dt_time.fromisoformat(slot["end_time"])
-        except Exception:
-            return to_h - from_h
-        s_h = s.hour + s.minute / 60.0
-        e_h = e.hour + e.minute / 60.0
-        intervals = [(s_h, e_h)] if s_h <= e_h else [(s_h, 24.0), (0.0, e_h)]
         overlap = sum(
             max(0.0, min(to_h, b) - max(from_h, a))
-            for a, b in intervals
+            for a, b in _merge_window_hours(slots)
         )
         return max(0.0, (to_h - from_h) - overlap)
 

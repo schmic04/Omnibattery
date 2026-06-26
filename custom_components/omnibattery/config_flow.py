@@ -128,6 +128,68 @@ _ZENDURE_MAX_POWER_W = 2400
 
 _LOGGER = logging.getLogger(__name__)
 
+_ALL_WEEKDAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+# How many predictive-charging windows the user may configure.
+MAX_CHARGING_WINDOWS = 3
+
+
+def _normalize_charging_windows(raw) -> list[dict]:
+    """Config value (legacy single dict | list | None) → list of window dicts."""
+    if not raw:
+        return []
+    if isinstance(raw, dict):
+        return [raw]
+    return list(raw)
+
+
+def _parse_charging_windows(user_input: dict) -> tuple[list[dict], dict]:
+    """Build the windows list from up to MAX_CHARGING_WINDOWS form rows.
+
+    Window 1 is required (enforced by the schema). Rows 2..N are optional: a row
+    with neither start nor end is skipped; a row with only one of them is an error.
+    Returns (windows, errors).
+    """
+    windows: list[dict] = []
+    errors: dict = {}
+    for i in range(1, MAX_CHARGING_WINDOWS + 1):
+        sfx = "" if i == 1 else f"_{i}"
+        start = user_input.get(f"start_time{sfx}")
+        end = user_input.get(f"end_time{sfx}")
+        days = user_input.get(f"days{sfx}", _ALL_WEEKDAYS)
+        if not start and not end:
+            continue
+        if not start or not end:
+            errors[f"start_time{sfx}"] = "incomplete_window"
+            continue
+        windows.append({"start_time": start, "end_time": end, "days": days})
+    return windows, errors
+
+
+def _charging_window_schema_fields(existing_windows: list[dict]) -> dict:
+    """Schema fragment for the window rows (row 1 required, rows 2..N optional)."""
+    days_selector = SelectSelector(
+        SelectSelectorConfig(
+            options=_ALL_WEEKDAYS,
+            translation_key="weekday",
+            multiple=True,
+            mode=SelectSelectorMode.DROPDOWN,
+        )
+    )
+    fields: dict = {}
+    for i in range(1, MAX_CHARGING_WINDOWS + 1):
+        sfx = "" if i == 1 else f"_{i}"
+        existing = existing_windows[i - 1] if i - 1 < len(existing_windows) else None
+        req = vol.Required if i == 1 else vol.Optional
+        if existing:
+            fields[req(f"start_time{sfx}", default=existing["start_time"])] = TimeSelector()
+            fields[req(f"end_time{sfx}", default=existing["end_time"])] = TimeSelector()
+            fields[vol.Optional(f"days{sfx}", default=existing.get("days", _ALL_WEEKDAYS))] = days_selector
+        else:
+            fields[req(f"start_time{sfx}")] = TimeSelector()
+            fields[req(f"end_time{sfx}")] = TimeSelector()
+            fields[vol.Optional(f"days{sfx}", default=_ALL_WEEKDAYS)] = days_selector
+    return fields
+
 
 def _time_ranges_overlap(start1: str, end1: str, start2: str, end2: str) -> bool:
     """Check if two time ranges overlap. Assumes start < end (no midnight crossing)."""
@@ -1034,14 +1096,13 @@ class MarstekVenusConfigFlow(LegacyDomainMigrationMixin, ConfigFlow, domain=DOMA
                                 if unit not in ["kWh", "Wh"]:
                                     errors["solar_forecast_sensor"] = "invalid_unit"
 
+                    windows, window_errors = _parse_charging_windows(user_input)
+                    errors.update(window_errors)
+
                     if not errors:
                         self.config_data["enable_predictive_charging"] = True
                         self.config_data[CONF_PREDICTIVE_CHARGING_MODE] = PREDICTIVE_MODE_TIME_SLOT
-                        self.config_data["charging_time_slot"] = {
-                            "start_time": user_input["start_time"],
-                            "end_time": user_input["end_time"],
-                            "days": user_input["days"],
-                        }
+                        self.config_data["charging_time_slot"] = windows
                         self.config_data[CONF_SOLAR_FORECAST_SENSOR] = forecast_sensor
                         self.config_data[CONF_PREDICTIVE_SAFETY_MARGIN_KWH] = user_input.get(CONF_PREDICTIVE_SAFETY_MARGIN_KWH, DEFAULT_PREDICTIVE_SAFETY_MARGIN_KWH)
                         self.config_data[CONF_PREDICTIVE_GRID_CHARGE_MARGIN_PCT] = user_input.get(CONF_PREDICTIVE_GRID_CHARGE_MARGIN_PCT, DEFAULT_PREDICTIVE_GRID_CHARGE_MARGIN_PCT)
@@ -1051,19 +1112,7 @@ class MarstekVenusConfigFlow(LegacyDomainMigrationMixin, ConfigFlow, domain=DOMA
                     _LOGGER.error("Error validating predictive charging config: %s", e)
                     errors["base"] = "unknown"
 
-        schema_dict = {
-            vol.Required("start_time"): TimeSelector(),
-            vol.Required("end_time"): TimeSelector(),
-            vol.Optional("days", default=["mon", "tue", "wed", "thu", "fri", "sat", "sun"]):
-                SelectSelector(
-                    SelectSelectorConfig(
-                        options=["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
-                        translation_key="weekday",
-                        multiple=True,
-                        mode=SelectSelectorMode.DROPDOWN,
-                    )
-                ),
-        }
+        schema_dict = _charging_window_schema_fields([])
         if not has_global_sensor:
             schema_dict[vol.Optional("solar_forecast_sensor")] = EntitySelector(
                 EntitySelectorConfig(domain="sensor")
@@ -2701,7 +2750,7 @@ class OptionsFlowHandler(OptionsFlow):
         errors = {}
 
         existing_config = self.config_entry.data
-        time_slot_current = existing_config.get("charging_time_slot", {})
+        existing_windows = _normalize_charging_windows(existing_config.get("charging_time_slot"))
         forecast_sensor_current = existing_config.get("solar_forecast_sensor", "")
 
         has_global_sensor = bool(self.config_entry.data.get(CONF_SOLAR_FORECAST_SENSOR))
@@ -2721,14 +2770,13 @@ class OptionsFlowHandler(OptionsFlow):
                             if unit not in ["kWh", "Wh"]:
                                 errors["solar_forecast_sensor"] = "invalid_unit"
 
+                windows, window_errors = _parse_charging_windows(user_input)
+                errors.update(window_errors)
+
                 if not errors:
                     self.config_data["enable_predictive_charging"] = True
                     self.config_data[CONF_PREDICTIVE_CHARGING_MODE] = PREDICTIVE_MODE_TIME_SLOT
-                    self.config_data["charging_time_slot"] = {
-                        "start_time": user_input["start_time"],
-                        "end_time": user_input["end_time"],
-                        "days": user_input["days"],
-                    }
+                    self.config_data["charging_time_slot"] = windows
                     self.config_data[CONF_SOLAR_FORECAST_SENSOR] = forecast_sensor
                     self.config_data[CONF_PREDICTIVE_SAFETY_MARGIN_KWH] = user_input.get(CONF_PREDICTIVE_SAFETY_MARGIN_KWH, DEFAULT_PREDICTIVE_SAFETY_MARGIN_KWH)
                     self.config_data[CONF_PREDICTIVE_GRID_CHARGE_MARGIN_PCT] = user_input.get(CONF_PREDICTIVE_GRID_CHARGE_MARGIN_PCT, DEFAULT_PREDICTIVE_GRID_CHARGE_MARGIN_PCT)
@@ -2737,38 +2785,13 @@ class OptionsFlowHandler(OptionsFlow):
                 _LOGGER.error("Error validating predictive charging config: %s", e)
                 errors["base"] = "unknown"
 
-        if time_slot_current:
-            defaults = {
-                "start_time": time_slot_current.get("start_time", "01:00:00"),
-                "end_time": time_slot_current.get("end_time", "06:00:00"),
-                "days": time_slot_current.get("days", ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]),
-                "sensor": forecast_sensor_current if forecast_sensor_current else "",
-                "margin": existing_config.get(CONF_PREDICTIVE_SAFETY_MARGIN_KWH, DEFAULT_PREDICTIVE_SAFETY_MARGIN_KWH),
-                "grid_margin": existing_config.get(CONF_PREDICTIVE_GRID_CHARGE_MARGIN_PCT, DEFAULT_PREDICTIVE_GRID_CHARGE_MARGIN_PCT),
-            }
-        else:
-            defaults = {
-                "start_time": "01:00:00",
-                "end_time": "06:00:00",
-                "days": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
-                "sensor": "",
-                "margin": DEFAULT_PREDICTIVE_SAFETY_MARGIN_KWH,
-                "grid_margin": DEFAULT_PREDICTIVE_GRID_CHARGE_MARGIN_PCT,
-            }
-
-        schema_dict = {
-            vol.Required("start_time", default=defaults["start_time"]): TimeSelector(),
-            vol.Required("end_time", default=defaults["end_time"]): TimeSelector(),
-            vol.Required("days", default=defaults["days"]):
-                SelectSelector(
-                    SelectSelectorConfig(
-                        options=["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
-                        translation_key="weekday",
-                        multiple=True,
-                        mode=SelectSelectorMode.DROPDOWN,
-                    )
-                ),
+        defaults = {
+            "sensor": forecast_sensor_current if forecast_sensor_current else "",
+            "margin": existing_config.get(CONF_PREDICTIVE_SAFETY_MARGIN_KWH, DEFAULT_PREDICTIVE_SAFETY_MARGIN_KWH),
+            "grid_margin": existing_config.get(CONF_PREDICTIVE_GRID_CHARGE_MARGIN_PCT, DEFAULT_PREDICTIVE_GRID_CHARGE_MARGIN_PCT),
         }
+
+        schema_dict = _charging_window_schema_fields(existing_windows)
         if not has_global_sensor:
             schema_dict[vol.Optional("solar_forecast_sensor", description={"suggested_value": defaults["sensor"]} if defaults["sensor"] else {})] = EntitySelector(
                 EntitySelectorConfig(domain="sensor")

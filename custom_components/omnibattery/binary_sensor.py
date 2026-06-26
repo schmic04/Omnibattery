@@ -283,8 +283,8 @@ class PredictiveChargingStatusSensor(BinarySensorEntity):
             "overridden": self.controller.predictive_charging_overridden,
         }
 
-        if self.controller.charging_time_slot:
-            attrs["time_slot"] = self.controller.charging_time_slot
+        if self.controller.charging_time_slots:
+            attrs["time_slots"] = self.controller.charging_time_slots
 
         active_slot_per_battery = {}
         manual_slot_owned = []

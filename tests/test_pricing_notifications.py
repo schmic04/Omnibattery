@@ -95,7 +95,7 @@ def test_predictive_daily_evaluation_expected():
 # format_dynamic_pricing_notification
 # ----------------------------------------------------------------------
 
-_DP_CFG = dict(unit="€/kWh", max_price_threshold=0.30,
+_DP_CFG = dict(unit="€/kWh", max_price_threshold=0.30, discharge_price_threshold=0.45,
                max_contracted_power=5000, max_charge_capacity=3000)
 
 
@@ -121,7 +121,8 @@ def test_dynamic_informational_lists_slots():
     assert "Price Info" in title and "cheapest" in title
     assert "Cheapest hours today (informational):" in message
     assert message.count("→") == 4  # one bullet per slot
-    assert "Max price limit: 0.3000 €/kWh" in message
+    assert "charge ≤ 0.3000 €/kWh" in message
+    assert "discharge ≥ 0.4500 €/kWh" in message
     assert "No charging will activate." in message
 
 

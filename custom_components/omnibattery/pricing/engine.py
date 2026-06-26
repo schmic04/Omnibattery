@@ -363,6 +363,7 @@ class PricingManager:
             schedule,
             unit=self._get_price_unit(),
             max_price_threshold=self._controller.max_price_threshold,
+            discharge_price_threshold=self._controller.discharge_price_threshold,
             max_contracted_power=self._controller.max_contracted_power,
             max_charge_capacity=self._controller.max_charge_capacity,
         )

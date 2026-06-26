@@ -117,6 +117,7 @@ def format_dynamic_pricing_notification(
     *,
     unit: str,
     max_price_threshold,
+    discharge_price_threshold,
     max_contracted_power,
     max_charge_capacity,
 ) -> tuple[str, str]:
@@ -133,6 +134,12 @@ def format_dynamic_pricing_notification(
         f"{avg_consumption:.2f} kWh ({days_in_history}-day avg)"
         if days_in_history > 0 else f"{avg_consumption:.2f} kWh (default)"
     )
+    _price_parts = []
+    if max_price_threshold is not None:
+        _price_parts.append(f"charge ≤ {max_price_threshold:.4f} {unit}")
+    if discharge_price_threshold is not None:
+        _price_parts.append(f"discharge ≥ {discharge_price_threshold:.4f} {unit}")
+    price_config_line = ("⚙️ Price thresholds: " + " | ".join(_price_parts) + "\n") if _price_parts else ""
 
     if schedule is None or not schedule.selected_slots:
         if not decision_data.get("should_charge", False):
@@ -143,6 +150,7 @@ def format_dynamic_pricing_notification(
                 f"☀️ Solar forecast: {solar_str}\n"
                 f"📊 Consumption: {consumption_str}\n\n"
                 f"✅ Available: {decision_data.get('total_available_kwh', 0):.2f} kWh ≥ {avg_consumption:.2f} kWh needed\n"
+                f"{price_config_line}"
                 f"No grid charging required."
             )
         else:
@@ -153,6 +161,7 @@ def format_dynamic_pricing_notification(
                 f"☀️ Solar forecast: {solar_str}\n"
                 f"📊 Consumption: {consumption_str}\n"
                 f"⚡ Energy deficit: {energy_deficit:.2f} kWh\n\n"
+                f"{price_config_line}"
                 f"Check price sensor or raise max price threshold."
             )
     else:
@@ -167,10 +176,6 @@ def format_dynamic_pricing_notification(
             f"  • {s.start.strftime('%H:%M')}-{s.end.strftime('%H:%M')} → {s.price:.4f} {unit}"
             for s in schedule.selected_slots
         )
-        threshold_line = (
-            f"Max price limit: {max_price_threshold:.4f} {unit}\n"
-            if max_price_threshold is not None else ""
-        )
         if not schedule.charging_needed:
             title = f"Predictive Charging: Price Info - {hours_label} cheapest"
             message = (
@@ -181,7 +186,7 @@ def format_dynamic_pricing_notification(
                 f"✅ Available: {decision_data.get('total_available_kwh', 0):.2f} kWh ≥ {decision_data.get('avg_consumption_kwh', 0):.2f} kWh needed\n\n"
                 f"💰 Cheapest hours today (informational):\n{slot_lines}\n\n"
                 f"Average price: {schedule.average_price:.4f} {unit}\n"
-                f"{threshold_line}"
+                f"{price_config_line}"
                 f"No charging will activate."
             )
         else:
@@ -193,7 +198,7 @@ def format_dynamic_pricing_notification(
                 f"💰 Selected hours (cheapest):\n{slot_lines}\n\n"
                 f"Average price: {schedule.average_price:.4f} {unit}\n"
                 f"Estimated cost: ~{schedule.estimated_cost:.2f} {cost_unit}\n"
-                f"{threshold_line}"
+                f"{price_config_line}"
                 f"Max charge power: {min(max_contracted_power, max_charge_capacity)}W "
                 f"(ICP: {max_contracted_power}W, batteries: {max_charge_capacity}W)"
             )

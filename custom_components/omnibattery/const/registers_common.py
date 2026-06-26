@@ -132,8 +132,8 @@ ALARM_BIT_DESCRIPTIONS: dict[int, str] = {
 # cycles = (total_discharge + total_charge) / 2 / battery_capacity
 CYCLE_SENSOR_DEFINITIONS = [
     {
-        "key": "battery_cycle_count_calc",
         "name": "Battery Cycle Count Calc",
+        "key": "battery_cycle_count_calc",
         "icon": "mdi:counter",
         "state_class": "measurement",
         "dependency_keys": {
@@ -147,8 +147,8 @@ CYCLE_SENSOR_DEFINITIONS = [
 # Per-battery total DC-coupled PV power (sum of MPPT inputs) — vA/vD only.
 SOLAR_POWER_SENSOR_DEFINITIONS = [
     {
-        "key": "solar_power",
         "name": "Solar Power",
+        "key": "solar_power",
         "unit": "W",
         "device_class": "power",
         "state_class": "measurement",
@@ -165,8 +165,8 @@ SOLAR_POWER_SENSOR_DEFINITIONS = [
 # (+ charge / - discharge).
 BATTERY_CELL_POWER_SENSOR_DEFINITIONS = [
     {
-        "key": "battery_cell_power",
         "name": "Battery Cell Power",
+        "key": "battery_cell_power",
         "unit": "W",
         "device_class": "power",
         "state_class": "measurement",

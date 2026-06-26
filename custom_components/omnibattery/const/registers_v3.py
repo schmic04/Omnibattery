@@ -9,12 +9,12 @@
 
 SENSOR_DEFINITIONS_V3 = [
     {
+        "name": "Battery SOC",
         "register": 37005,
         "scale": 1,
         "unit": "%",
         "device_class": "battery",
         "state_class": "measurement",
-        "name": "Battery SOC",
         "key": "battery_soc",
         "enabled_by_default": True,
         "data_type": "uint16",
@@ -22,12 +22,12 @@ SENSOR_DEFINITIONS_V3 = [
         "scan_interval": "medium",
     },
     {
+        "name": "Battery Total Energy",
         "register": 32105,
         "scale": 0.001,
         "unit": "kWh",
         "device_class": "energy",
         "state_class": "total",
-        "name": "Battery Total Energy",
         "key": "battery_total_energy",
         "enabled_by_default": True,
         "data_type": "uint16",
@@ -35,12 +35,12 @@ SENSOR_DEFINITIONS_V3 = [
         "scan_interval": "low",
     },
     {
+        "name": "Battery Voltage",
         "register": 30100,
         "scale": 0.01,
         "unit": "V",
         "device_class": "voltage",
         "state_class": "measurement",
-        "name": "Battery Voltage",
         "key": "battery_voltage",
         "enabled_by_default": True,
         "data_type": "uint16",
@@ -48,13 +48,13 @@ SENSOR_DEFINITIONS_V3 = [
         "scan_interval": "medium",
     },
     {
+        "name": "Battery Power",
         "register": 30001,
         "count": 1,
         "scale": 1,
         "unit": "W",
         "device_class": "power",
         "state_class": "measurement",
-        "name": "Battery Power",
         "key": "battery_power",
         "enabled_by_default": True,
         "data_type": "int16",
@@ -76,12 +76,12 @@ SENSOR_DEFINITIONS_V3 = [
         "scan_interval": "high",
     },
     {
+        "name": "Internal Temperature",
         "register": 35000,
         "scale": 0.1,
         "unit": "°C",
         "device_class": "temperature",
         "state_class": "measurement",
-        "name": "Internal Temperature",
         "key": "internal_temperature",
         "enabled_by_default": True,
         "data_type": "int16",
@@ -89,13 +89,13 @@ SENSOR_DEFINITIONS_V3 = [
         "scan_interval": "medium",
     },
     {
+        "name": "AC Power",
         "register": 30006,
         "count": 1,
         "scale": 1,
         "unit": "W",
         "device_class": "power",
         "state_class": "measurement",
-        "name": "AC Power",
         "key": "ac_power",
         "enabled_by_default": True,
         "data_type": "int16",
@@ -103,13 +103,13 @@ SENSOR_DEFINITIONS_V3 = [
         "scan_interval": "high",
     },
     {
+        "name": "Total Charging Energy",
         "register": 33000,
         "count": 2,
         "scale": 0.01,
         "unit": "kWh",
         "device_class": "energy",
         "state_class": "total_increasing",
-        "name": "Total Charging Energy",
         "key": "total_charging_energy",
         "enabled_by_default": True,
         "data_type": "uint32",
@@ -117,13 +117,13 @@ SENSOR_DEFINITIONS_V3 = [
         "scan_interval": "low",
     },
     {
+        "name": "Total Discharging Energy",
         "register": 33002,
         "count": 2,
         "scale": 0.01,
         "unit": "kWh",
         "device_class": "energy",
         "state_class": "total_increasing",
-        "name": "Total Discharging Energy",
         "key": "total_discharging_energy",
         "enabled_by_default": True,
         "data_type": "int32",
@@ -131,13 +131,13 @@ SENSOR_DEFINITIONS_V3 = [
         "scan_interval": "low",
     },
     {
+        "name": "Total Daily Charging Energy",
         "register": 33004,
         "count": 2,
         "scale": 0.01,
         "unit": "kWh",
         "device_class": "energy",
         "state_class": "total_increasing",
-        "name": "Total Daily Charging Energy",
         "key": "total_daily_charging_energy",
         "enabled_by_default": True,
         "data_type": "uint32",
@@ -145,13 +145,13 @@ SENSOR_DEFINITIONS_V3 = [
         "scan_interval": "low",
     },
     {
+        "name": "Total Daily Discharging Energy",
         "register": 33006,
         "count": 2,
         "scale": 0.01,
         "unit": "kWh",
         "device_class": "energy",
         "state_class": "total_increasing",
-        "name": "Total Daily Discharging Energy",
         "key": "total_daily_discharging_energy",
         "enabled_by_default": True,
         "data_type": "int32",
@@ -159,11 +159,11 @@ SENSOR_DEFINITIONS_V3 = [
         "scan_interval": "low",
     },
     {
+        "name": "Inverter State",
         "register": 35100,
         "scale": 1,
         "unit": None,
         "icon": "mdi:state-machine",
-        "name": "Inverter State",
         "key": "inverter_state",
         "enabled_by_default": True,
         "data_type": "uint16",
@@ -349,8 +349,8 @@ BINARY_SENSOR_DEFINITIONS_V3 = [
 
 SELECT_DEFINITIONS_V3 = [
     {
-        "register": 42010,
         "name": "Force Mode",
+        "register": 42010,
         "key": "force_mode",
         "enabled_by_default": True,
         "scan_interval": "high",
@@ -371,10 +371,10 @@ SELECT_DEFINITIONS_V3 = [
 
 SWITCH_DEFINITIONS_V3 = [
     {
+        "name": "Backup Function",
         "register": 41200,
         "command_on": 0,
         "command_off": 1,
-        "name": "Backup Function",
         "key": "backup_function",
         "enabled_by_default": True,
         "data_type": "uint16",
@@ -395,8 +395,8 @@ SWITCH_DEFINITIONS_V3 = [
 
 NUMBER_DEFINITIONS_V3 = [
     {
-        "register": 42020,
         "name": "Set Charge Power",
+        "register": 42020,
         "key": "set_charge_power",
         "enabled_by_default": True,
         "icon": "mdi:battery-arrow-up-outline",
@@ -408,8 +408,8 @@ NUMBER_DEFINITIONS_V3 = [
         "scan_interval": "high",
     },
     {
-        "register": 42021,
         "name": "Set Discharge Power",
+        "register": 42021,
         "key": "set_discharge_power",
         "enabled_by_default": True,
         "icon": "mdi:battery-arrow-down-outline",
@@ -421,8 +421,8 @@ NUMBER_DEFINITIONS_V3 = [
         "scan_interval": "high",
     },
     {
-        "register": 44002,
         "name": "Max Charge Power",
+        "register": 44002,
         "key": "max_charge_power",
         "enabled_by_default": True,
         "icon": "mdi:battery-arrow-up-outline",
@@ -434,8 +434,8 @@ NUMBER_DEFINITIONS_V3 = [
         "scan_interval": "high",
     },
     {
-        "register": 44003,
         "name": "Max Discharge Power",
+        "register": 44003,
         "key": "max_discharge_power",
         "enabled_by_default": True,
         "icon": "mdi:battery-arrow-down-outline",
@@ -450,11 +450,11 @@ NUMBER_DEFINITIONS_V3 = [
 
 BUTTON_DEFINITIONS_V3 = [
     {
+        "name": "Reset Device",
         "register": 41000,
         "command": 21930,
         "icon": "mdi:restart",
         "category": "diagnostic",
-        "name": "Reset Device",
         "key": "reset_device",
         "enabled_by_default": False,
         "data_type": "uint16",
@@ -463,8 +463,8 @@ BUTTON_DEFINITIONS_V3 = [
 
 EFFICIENCY_SENSOR_DEFINITIONS_V3 = [
     {
-        "key": "round_trip_efficiency_total",
         "name": "Round-Trip Efficiency Total",
+        "key": "round_trip_efficiency_total",
         "unit": "%",
         "state_class": "measurement",
         "dependency_keys": {

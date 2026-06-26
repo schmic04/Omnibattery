@@ -10,8 +10,8 @@ BINARY_SENSOR_DEFINITIONS_VD = _WIFI_CLOUD_BINARY_SENSORS
 
 SELECT_DEFINITIONS_VD = [
     {
-        "register": 42010,
         "name": "Force Mode",
+        "register": 42010,
         "key": "force_mode",
         "enabled_by_default": True,
         "scan_interval": "high",
@@ -35,8 +35,8 @@ BUTTON_DEFINITIONS_VD = BUTTON_DEFINITIONS_V3
 
 NUMBER_DEFINITIONS_VD = [
     {
-        "register": 42020,
         "name": "Set Charge Power",
+        "register": 42020,
         "key": "set_charge_power",
         "enabled_by_default": True,
         "icon": "mdi:battery-arrow-up-outline",
@@ -48,8 +48,8 @@ NUMBER_DEFINITIONS_VD = [
         "scan_interval": "high",
     },
     {
-        "register": 42021,
         "name": "Set Discharge Power",
+        "register": 42021,
         "key": "set_discharge_power",
         "enabled_by_default": True,
         "icon": "mdi:battery-arrow-down-outline",
@@ -61,8 +61,8 @@ NUMBER_DEFINITIONS_VD = [
         "scan_interval": "high",
     },
     {
-        "register": 44002,
         "name": "Max Charge Power",
+        "register": 44002,
         "key": "max_charge_power",
         "enabled_by_default": True,
         "icon": "mdi:battery-arrow-up-outline",
@@ -74,8 +74,8 @@ NUMBER_DEFINITIONS_VD = [
         "scan_interval": "high",
     },
     {
-        "register": 44003,
         "name": "Max Discharge Power",
+        "register": 44003,
         "key": "max_discharge_power",
         "enabled_by_default": True,
         "icon": "mdi:battery-arrow-down-outline",
@@ -87,8 +87,8 @@ NUMBER_DEFINITIONS_VD = [
         "scan_interval": "high",
     },
     {
-        "register": 42011,
         "name": "Charge To SOC",
+        "register": 42011,
         "key": "charge_to_soc",
         "enabled_by_default": False,
         "icon": "mdi:battery-sync-outline",

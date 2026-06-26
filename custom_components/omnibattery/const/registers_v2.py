@@ -107,13 +107,13 @@ SENSOR_DEFINITIONS = [
         "scan_interval": "low"
     },
     {
+        "name": "Total Daily Charging Energy",
         "register": 33004,
         "count": 2,
         "scale": 0.01,
         "unit": "kWh",
         "device_class": "energy",
         "state_class": "total_increasing",
-        "name": "Total Daily Charging Energy",
         "key": "total_daily_charging_energy",
         "enabled_by_default": True,
         "data_type": "uint32",
@@ -121,13 +121,13 @@ SENSOR_DEFINITIONS = [
         "scan_interval": "low",
     },
     {
+        "name": "Total Daily Discharging Energy",
         "register": 33006,
         "count": 2,
         "scale": 0.01,
         "unit": "kWh",
         "device_class": "energy",
         "state_class": "total_increasing",
-        "name": "Total Daily Discharging Energy",
         "key": "total_daily_discharging_energy",
         "enabled_by_default": True,
         "data_type": "int32",
@@ -582,8 +582,8 @@ REGISTER_BLOCKS_V2 = [
 # Definitions for efficiency sensors
 EFFICIENCY_SENSOR_DEFINITIONS = [
     {
-        "key": "round_trip_efficiency_total",
         "name": "Round-Trip Efficiency Total",
+        "key": "round_trip_efficiency_total",
         "unit": "%",
         "state_class": "measurement",
         "dependency_keys": {

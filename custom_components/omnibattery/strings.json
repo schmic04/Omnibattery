@@ -939,6 +939,9 @@
       "charge_delay": {
         "name": "Charge Delay"
       },
+      "weekly_full_charge_delay": {
+        "name": "Delay Weekly Full Charge"
+      },
       "capacity_protection": {
         "name": "Peak Shaving"
       },

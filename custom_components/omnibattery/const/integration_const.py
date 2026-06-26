@@ -136,7 +136,10 @@ CONF_PREDICTIVE_CHARGING_OVERRIDDEN = "predictive_charging_overridden"
 CONF_WEEKLY_FULL_CHARGE_DAY = "weekly_full_charge_day"
 CONF_ENABLE_WEEKLY_FULL_CHARGE_DELAY = "enable_weekly_full_charge_delay"
 CONF_WEEKLY_FULL_CHARGE_SKIP_DELAY = "weekly_full_charge_skip_delay"
-DEFAULT_WEEKLY_FULL_CHARGE_SKIP_DELAY = False
+# Default True preserves the historic behaviour: the weekly full charge bypasses
+# the solar charge delay and charges immediately on its target day. The runtime
+# switch flips this so the weekly charge can instead wait for the delay to unlock.
+DEFAULT_WEEKLY_FULL_CHARGE_SKIP_DELAY = True
 CONF_ENABLE_BALANCE_MONITOR = "enable_balance_monitor"
 
 # Cell Balance Monitor

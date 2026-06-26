@@ -945,6 +945,9 @@
       "charge_delay": {
         "name": "Délai de Charge"
       },
+      "weekly_full_charge_delay": {
+        "name": "Retarder la Charge Complète Hebdomadaire"
+      },
       "capacity_protection": {
         "name": "Écrêtement de Pointe"
       },

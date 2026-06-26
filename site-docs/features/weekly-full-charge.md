@@ -42,7 +42,9 @@ See [Advanced options](/configuration/advanced.md) for full details.
 
 If [solar charge delay](solar-charge-delay.md) is active, the weekly charge can be postponed while the forecast solar production is sufficient to reach 100%.
 
-When the weekly full charge is active, the integration can bypass the delay so the battery reaches the top-voltage measurement point and the balance reading is not skipped.
+When the weekly full charge is active, the integration bypasses the delay by default so the battery reaches the top-voltage measurement point and the balance reading is not skipped.
+
+The **Delay weekly full charge** switch (`weekly_full_charge_delay`, on the Weekly full charge card) reverses this: turn it on to let the weekly charge wait for the solar charge delay to unlock, charging from solar instead of starting immediately on the target day. It only appears when both weekly full charge and the charge delay are configured.
 
 ## Modbus register involved
 

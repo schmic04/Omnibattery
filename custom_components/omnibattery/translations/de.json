@@ -945,6 +945,9 @@
       "charge_delay": {
         "name": "Ladeverzögerung"
       },
+      "weekly_full_charge_delay": {
+        "name": "Wöchentliche Vollladung verzögern"
+      },
       "capacity_protection": {
         "name": "Spitzenlastkappung"
       },

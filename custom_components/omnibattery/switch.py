@@ -20,6 +20,7 @@ from .const import (
     CONF_ENABLE_HOURLY_BALANCE,
     CONF_ENABLE_SYSTEM_POWER_LIMITS,
     CONF_ENABLE_WEEKLY_FULL_CHARGE_DELAY,
+    CONF_WEEKLY_FULL_CHARGE_SKIP_DELAY,
     CONF_FULL_CHARGE_VOLTAGE_TAPER_ENABLED,
     CONF_MANUAL_MODE_ENABLED,
     CONF_NO_PD_MODE_ENABLED,
@@ -75,6 +76,12 @@ async def async_setup_entry(
     )
     if controller and has_charge_delay_config:
         entities.append(ChargeDelaySwitch(hass, entry, controller))
+
+    # Add weekly-full-charge delay switch: lets the weekly charge wait for the
+    # solar charge delay instead of charging immediately. Only meaningful when
+    # both weekly full charge and the charge delay are configured.
+    if controller and controller.weekly_full_charge_enabled and has_charge_delay_config:
+        entities.append(WeeklyFullChargeDelaySwitch(hass, entry, controller))
 
     # Add hourly balance switch (system-level, when hourly balance is configured)
     if controller and CONF_ENABLE_HOURLY_BALANCE in entry.data:
@@ -635,6 +642,62 @@ class ChargeDelaySwitch(SwitchEntity):
         self.hass.config_entries.async_update_entry(self.entry, data=new_data)
         _LOGGER.info("Charge Delay DISABLED")
         self.async_write_ha_state()
+
+    @property
+    def device_info(self):
+        """Return device information for the system."""
+        return {
+            "identifiers": {(DOMAIN, "marstek_venus_system")},
+            "name": "Omnibattery System",
+            "manufacturer": "Omnibattery",
+            "model": "Multi-Battery System",
+        }
+
+
+class WeeklyFullChargeDelaySwitch(SwitchEntity):
+    """Switch letting the weekly full charge be postponed by the solar charge delay.
+
+    ON  = weekly full charge respects the charge delay (waits for solar).
+    OFF = weekly full charge bypasses the delay and charges immediately (default).
+    """
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, controller) -> None:
+        """Initialize the weekly full charge delay switch."""
+        self.hass = hass
+        self.entry = entry
+        self.controller = controller
+
+        self._attr_has_entity_name = True
+        self._attr_translation_key = "weekly_full_charge_delay"
+        self._attr_unique_id = f"{SYSTEM_UNIQUE_ID_PREFIX}weekly_full_charge_delay"
+        self.entity_id = system_entity_id("switch", "weekly_full_charge_delay")
+        self._attr_icon = "mdi:timer-sand"
+        self._attr_should_poll = False
+
+    @property
+    def is_on(self) -> bool:
+        """Return True when the weekly full charge respects the charge delay."""
+        return not self.controller._weekly_full_charge_skip_delay
+
+    async def _set_skip(self, skip: bool) -> None:
+        """Persist the skip flag and update the controller."""
+        self.controller._weekly_full_charge_skip_delay = skip
+        new_data = dict(self.entry.data)
+        new_data[CONF_WEEKLY_FULL_CHARGE_SKIP_DELAY] = skip
+        self.hass.config_entries.async_update_entry(self.entry, data=new_data)
+        _LOGGER.info(
+            "Weekly Full Charge delay %s",
+            "DISABLED (bypassing delay)" if skip else "ENABLED (respecting delay)",
+        )
+        self.async_write_ha_state()
+
+    async def async_turn_on(self, **kwargs) -> None:
+        """Let the weekly full charge wait for the solar charge delay."""
+        await self._set_skip(False)
+
+    async def async_turn_off(self, **kwargs) -> None:
+        """Bypass the delay so the weekly full charge starts immediately."""
+        await self._set_skip(True)
 
     @property
     def device_info(self):

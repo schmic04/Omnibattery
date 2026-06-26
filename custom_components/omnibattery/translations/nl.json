@@ -945,6 +945,9 @@
       "charge_delay": {
         "name": "Laadvertraging"
       },
+      "weekly_full_charge_delay": {
+        "name": "Wekelijkse Volledige Lading Vertragen"
+      },
       "capacity_protection": {
         "name": "Piekbegrenzing"
       },

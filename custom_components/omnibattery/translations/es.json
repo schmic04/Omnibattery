@@ -948,6 +948,9 @@
       "charge_delay": {
         "name": "Retraso de Carga"
       },
+      "weekly_full_charge_delay": {
+        "name": "Retrasar Carga Semanal Completa"
+      },
       "capacity_protection": {
         "name": "Reducción de Picos"
       },

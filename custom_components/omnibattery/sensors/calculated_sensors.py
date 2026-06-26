@@ -1,4 +1,4 @@
-"""Calculated sensors for the Marstek Venus Energy Manager integration."""
+"""Calculated sensors for the Omnibattery integration."""
 from __future__ import annotations
 
 import time

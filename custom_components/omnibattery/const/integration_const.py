@@ -1,4 +1,4 @@
-"""Integration-level configuration constants for the Marstek Venus Energy Manager."""
+"""Integration-level configuration constants for Omnibattery."""
 
 DOMAIN = "omnibattery"
 

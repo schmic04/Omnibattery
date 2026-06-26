@@ -1,4 +1,4 @@
-"""Hourly net balance manager for Marstek Venus Energy Manager."""
+"""Hourly net balance manager for Omnibattery."""
 from __future__ import annotations
 
 import logging

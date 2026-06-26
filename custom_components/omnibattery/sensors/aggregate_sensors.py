@@ -1,4 +1,4 @@
-"""Aggregate sensors for the Marstek Venus Energy Manager integration."""
+"""Aggregate sensors for the Omnibattery integration."""
 from __future__ import annotations
 
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass, SensorStateClass

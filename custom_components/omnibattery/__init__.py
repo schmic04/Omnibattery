@@ -1,4 +1,4 @@
-"""The Marstek Venus Energy Manager integration."""
+"""The Omnibattery integration."""
 from __future__ import annotations
 
 import asyncio
@@ -4719,8 +4719,9 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     v8 -> v9: re-key system-level entity unique_ids off the config entry_id and
               onto a stable "marstek_venus_system_" prefix, and heal the duplicate
               entities the Omnibattery domain migration created (orphan + `_2`).
+    v9 -> v10: rename config entry title to "Omnibattery".
     """
-    if entry.version >= 9:
+    if entry.version >= 10:
         return True
 
     new_data = dict(entry.data)
@@ -4941,12 +4942,13 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             healed,
         )
 
-    hass.config_entries.async_update_entry(entry, data=new_data, version=9)
+    hass.config_entries.async_update_entry(entry, title="Omnibattery", data=new_data, version=10)
+    _LOGGER.info("Omnibattery: migrated config entry to version 10 (renamed title to Omnibattery)")
     return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Marstek Venus Energy Manager from a config entry."""
+    """Set up Omnibattery from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
     # Register the sidebar dashboard panel (once per HA instance, non-blocking).

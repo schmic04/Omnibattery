@@ -1,4 +1,4 @@
-"""Config flow for Marstek Venus Energy Manager integration."""
+"""Config flow for Omnibattery integration."""
 from __future__ import annotations
 
 import asyncio
@@ -487,7 +487,7 @@ def _finalize_slot(step_a: dict, step_b: dict | None) -> dict:
 class MarstekVenusConfigFlow(LegacyDomainMigrationMixin, ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Omnibattery."""
 
-    VERSION = 9
+    VERSION = 10
 
     def __init__(self):
         """Initialize the config flow."""
@@ -1648,7 +1648,7 @@ class MarstekVenusConfigFlow(LegacyDomainMigrationMixin, ConfigFlow, domain=DOMA
                 self.config_data[CONF_SYSTEM_MAX_DISCHARGE_POWER] = DEFAULT_SYSTEM_MAX_DISCHARGE_POWER
                 self.config_data[CONF_ENABLE_BALANCE_MONITOR] = True
                 return self.async_create_entry(
-                    title="Marstek Venus Energy Manager", data=self.config_data
+                    title="Omnibattery", data=self.config_data
                 )
 
         return self.async_show_form(
@@ -1685,7 +1685,7 @@ class MarstekVenusConfigFlow(LegacyDomainMigrationMixin, ConfigFlow, domain=DOMA
             )
             self.config_data[CONF_ENABLE_BALANCE_MONITOR] = True
             return self.async_create_entry(
-                title="Marstek Venus Energy Manager", data=self.config_data
+                title="Omnibattery", data=self.config_data
             )
 
         return self.async_show_form(

@@ -1,4 +1,4 @@
-"""Hourly net balance sensor entity for Marstek Venus Energy Manager."""
+"""Hourly net balance sensor entity for Omnibattery."""
 from __future__ import annotations
 
 from typing import Any

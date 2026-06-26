@@ -1,4 +1,4 @@
-"""Binary sensor platform for the Marstek Venus Energy Manager integration."""
+"""Binary sensor platform for the Omnibattery integration."""
 from __future__ import annotations
 
 import logging

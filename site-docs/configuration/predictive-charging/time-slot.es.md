@@ -6,8 +6,12 @@ Carga desde la red durante una **ventana horaria fija** (típicamente tarifa noc
 
 | Campo | Descripción |
 |---|---|
-| **Ventana horaria** | Inicio y fin de la franja de carga (p. ej. `02:00` – `05:00`) |
+| **Ventana de carga 1** | Inicio y fin de la primera franja de carga (p. ej. `02:00` – `05:00`), más los días de la semana en que aplica |
+| **Ventanas de carga 2 y 3** | (Opcional) Hasta dos ventanas más, cada una con su inicio/fin y días |
 | **Sensor de previsión solar** | Sensor de producción solar del día actual en kWh (opcional) |
+
+!!! note "Hasta 3 ventanas"
+    Puedes configurar 1, 2 o 3 ventanas de carga — útil para una tarifa con bloque nocturno y otro de mediodía. Rellena solo la ventana 1 para el comportamiento de ventana única anterior; cada ventana extra necesita **tanto** una hora de inicio como de fin (rellena ambas o déjalas ambas vacías). El cálculo de la ventana de consumo usa la unión de todas las ventanas configuradas.
 
 !!! danger "Cambio importante en v1.6.0"
     El campo de sensor de previsión solar ahora debe apuntar al sensor de **hoy** (p. ej. `sensor.solcast_pv_forecast_forecast_today`), no al de mañana.

@@ -47,6 +47,18 @@ The switch state is persisted in the config entry and survives restarts.
 
 ---
 
+## Exclusion % slider
+
+Exclusion is not all-or-nothing. Each excluded device also gets an **Exclusion %** slider (`<device> – Exclusion %`, `number.*_exclusion_pct`, 0–100 %, default `100`) controlling **how much** of its demand stays off the battery:
+
+- `100 %` (default) — the device is fully masked, exactly as before. The battery covers none of its load.
+- `0 %` — the device is treated as normal household load; the battery covers it like anything else.
+- e.g. `60 %` — 60 % of the device's power is kept off the battery; the battery may cover the remaining 40 %.
+
+This lets the battery cover *part* of a big load instead of all-or-nothing — for example letting a 2.5 kW battery help with a 7 kW EV charger up to its share, rather than ignoring the charger entirely. The slider is per device and adjustable at runtime.
+
+---
+
 ## EV charger without power telemetry
 
 Some EV charger integrations do not expose a real-time power sensor — they only report a **charging state** (e.g. `Charging`, `Idle`, `Disconnected`). This option is designed for those chargers.

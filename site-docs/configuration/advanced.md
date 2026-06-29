@@ -99,6 +99,6 @@ The min charge/discharge power parameters are useful to prevent inefficient micr
 
 The system max charge/discharge caps are useful when the installation has a shared hardware or wiring limit. They do not reduce each battery's individual maximum: if only one battery is active, it can still use its own configured limit; when several batteries are active, the controller throttles the combined total to the configured system cap.
 
-When **Enable system power limits** is off, both caps are ignored and their runtime number entities are not created. When enabled, the caps are exposed as slider entities on the Marstek Venus System device.
+When **Enable system power limits** is off, both caps are ignored and their runtime number entities are not created. When enabled, the caps are exposed as slider entities on the Omnibattery System device.
 
 ![Advanced PD controller configuration](../assets/screenshots/configuration/advanced-pd-controller-config.png){ width="650"  style="display: block; margin: 0 auto;"}

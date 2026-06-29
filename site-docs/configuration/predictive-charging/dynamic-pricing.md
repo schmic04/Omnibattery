@@ -8,7 +8,11 @@ Automatically selects the **cheapest hours of the day** to cover the calculated 
 - **PVPC** (ESIOS REE, Spain)
 - **CKW** (Switzerland)
 - **EPEX Spot** (e.g. aWATTar)
-- **ENTSO-e** (Trnasparency Platform)
+- **ENTSO-e** (Transparency Platform)
+- **Tibber** — no price sensor needed; the engine polls the `tibber.get_prices` service directly (see below)
+
+!!! note "Tibber needs no sensor"
+    Selecting **Tibber** as the price integration leaves the *Electricity price sensor* field unused — the engine calls the `tibber.get_prices` service (today's prices, plus tomorrow's after ~13:00), caches the slots and refreshes hourly. The official Tibber integration must be configured in HA.
 
 ## Configuration
 
@@ -18,6 +22,7 @@ Automatically selects the **cheapest hours of the day** to cover the calculated 
 | **Electricity price sensor** | HA entity with the current price (and hourly forecast attributes) |
 | **Max price threshold (€)** | (Optional) Price ceiling; does not charge even during "cheap" hours if the price exceeds this value. Also used as the discharge threshold when price-based discharge control is enabled |
 | **Only discharge when price is above threshold** | (Optional) Price-gated discharge — see below |
+| **Discharge price floor (€)** | (Optional) Separate floor for price-gated discharge — opens an idle band between the charge ceiling and this floor. Empty = reuse the max price threshold for both. See [Separate discharge price floor](#separate-discharge-price-floor) |
 | **Solar forecast safety margin (kWh)** | (Optional) Extra energy buffer added to consumption forecast before deciding whether to charge (default 0 kWh) |
 | **Predictive grid charge margin (%)** | (Optional) Tops up the grid-charge amount to hedge optimistic solar forecasts — e.g. a 2 kWh grid need at 50 % charges 3 kWh. Capped at the gap to max SOC (default 0 %) |
 
@@ -62,6 +67,20 @@ The threshold is resolved as follows:
 2. If **Max price threshold** is empty, the daily average price is used.
 
 The daily average price is calculated automatically during the 00:05 evaluation from the hourly price profile. The goal is to preserve battery energy for the most expensive hours of the day. If no fixed threshold is configured and the daily average is not available yet, discharge control does not act.
+
+### Separate discharge price floor
+
+By default a single threshold gates both ends: the battery grid-charges only **below** the max price threshold and discharges only **above** it. The optional **Discharge price floor** decouples the two by setting a lower discharge floor, opening an **idle band** between them:
+
+```
+price ≥ max price threshold     → discharge allowed
+discharge floor < price < ceiling → idle (no grid charge, no discharge)
+price ≤ discharge price floor    → discharge BLOCKED
+```
+
+In the idle band the battery neither grid-charges nor discharges — but **solar-surplus charging still works**. This avoids cycling the battery for the marginal price difference around the average. The floor must be **at or above** the charge ceiling (it is validated on save); leave it empty to reuse the max price threshold for both (the single-threshold behaviour above).
+
+Both thresholds are also exposed as live `number` entities (**Max Price Threshold** and **Discharge Price Floor**) so automations can rewrite them without entering the options flow.
 
 ### Interaction with time slots
 

@@ -99,6 +99,6 @@ Los parámetros de potencia mínima de carga/descarga son útiles para evitar mi
 
 Los limites maximos del sistema son utiles cuando la instalacion tiene un limite compartido de hardware o cableado. No reducen el maximo individual de cada bateria: si solo una bateria esta activa, puede seguir usando su limite configurado; cuando hay varias baterias activas, el controlador limita el total combinado al cap configurado.
 
-Cuando **Activar limites de potencia del sistema** esta desactivado, ambos caps se ignoran y no se crean sus entidades `number` de runtime. Cuando esta activado, los caps se exponen como sliders en el dispositivo Marstek Venus System.
+Cuando **Activar limites de potencia del sistema** esta desactivado, ambos caps se ignoran y no se crean sus entidades `number` de runtime. Cuando esta activado, los caps se exponen como sliders en el dispositivo Omnibattery System.
 
 ![Configuración avanzada del controlador PD](../assets/screenshots/configuration/advanced-pd-controller-config.png){ width="650"  style="display: block; margin: 0 auto;"}

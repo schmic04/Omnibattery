@@ -109,6 +109,28 @@ The derivative term is low-pass filtered (short time constant) before it reaches
 
 The controller assumes each battery delivers exactly the power it was commanded. When a battery cannot — for example because of SOC/voltage taper or ramp lag — the controller detects the sustained shortfall by comparing the command against the measured AC power, and re-anchors its internal baseline to reality. This prevents the control output from "winding up" past what the hardware actually delivered, which would otherwise cause an overshoot or a brief grid export when the load later drops.
 
+## Relay and write-rate protection
+
+Two optional sliders protect the hardware from chatter when the grid hovers around the deadband edge or a fast meter publishes bursts. Both default to a near-disabled value, so existing installs are unchanged.
+
+| Slider | Default | What it does |
+|---|---|---|
+| **PD Relay Cooldown** (`number.*_pd_relay_cooldown`, s) | `0` (off) | Minimum time the battery stays engaged before returning to idle. Stops relay on/off chatter during solar ramp-up/down. The dwell is timed **from the moment idle is requested**, so it actually holds. While held it runs at the configured min charge/discharge power (or 100 W if that is 0). Large imbalances bypass it. Only gates active→idle, not charge↔discharge flips. |
+| **PD Min Cycle Interval** (`number.*_pd_min_cycle_interval`, s) | `1` | Caps how often the event-driven loop runs — grid updates closer together than this are dropped, so a fast meter can't flood slow Modbus bridges (e.g. Elfin EW11) with write bursts. The 2 s safety watchdog is never gated, so control never stalls. `0` = disabled. |
+
+## No-PD direct tracking mode
+
+An **opt-in** alternative to the PD control law, for users who want the battery to follow the consumption sensor **1:1 in a single cycle** — no integral, derivative, smoothing, rate limiter or hysteresis. Enable it with the **No-PD Direct Tracking** switch (`switch.*_no_pd_mode`); the PD controller is unchanged and untouched while it is off (the two are mutually exclusive in the dashboard).
+
+Each cycle it reconstructs the home load from the battery's **measured** AC power (`new = measured − error`) rather than from the last command, so it stays stable across the multi-second inverter ramp instead of oscillating rail-to-rail.
+
+It reuses the existing deadband, min charge/discharge power, relay min-ON and grid-setpoint sliders, plus one mode-specific knob:
+
+- **No-PD Command Delay** (`number.*_no_pd_command_delay`, s) — debounces fast meters by collapsing a burst of updates into a single command on the latest value.
+
+!!! tip "When to use it"
+    No-PD suits a clean, fast meter where you want the most direct possible response and find PD tuning unnecessary. On a noisy meter the PD controller's filtering is usually the better choice.
+
 ## Backup function exclusion
 
 A battery is excluded from the PD controller when **both** of the following are true:

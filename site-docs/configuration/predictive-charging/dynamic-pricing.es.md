@@ -9,6 +9,10 @@ Selecciona automáticamente las **horas más baratas del día** para cubrir el d
 - **CKW** (Suiza)
 - **EPEX Spot** (p. ej. aWATTar)
 - **ENTSO-e** (Plataforma de Transparencia)
+- **Tibber** — no necesita sensor de precio; el motor llama directamente al servicio `tibber.get_prices` (ver abajo)
+
+!!! note "Tibber no necesita sensor"
+    Al elegir **Tibber** como integración de precios, el campo *Sensor de precio* queda sin usar — el motor llama al servicio `tibber.get_prices` (precios de hoy y, tras las ~13:00, los de mañana), cachea los slots y refresca cada hora. La integración oficial de Tibber debe estar configurada en HA.
 
 ## Configuración
 
@@ -18,6 +22,7 @@ Selecciona automáticamente las **horas más baratas del día** para cubrir el d
 | **Sensor de precio** | Entidad HA con el precio actual (y atributos de previsión horaria) |
 | **Umbral máximo de precio** | (Opcional) Precio techo; no carga aunque la hora sea "barata" si supera este valor. También se usa como umbral de descarga cuando el control de descarga por precio está activado |
 | **Descargar solo cuando el precio supere el umbral** | (Opcional) Descarga condicionada al precio actual — ver abajo |
+| **Suelo de precio de descarga (€)** | (Opcional) Suelo separado para la descarga condicionada — abre una banda de reposo entre el techo de carga y este suelo. Vacío = reutiliza el umbral máximo para ambos. Ver [Suelo de precio de descarga separado](#suelo-de-precio-de-descarga-separado) |
 | **Margen de seguridad de previsión solar (kWh)** | (Opcional) Buffer de energía adicional añadido a la previsión de consumo antes de decidir si cargar (por defecto 0 kWh) |
 | **Margen de carga de red predictiva (%)** | (Opcional) Aumenta la cantidad de carga de red para cubrir previsiones solares optimistas — p. ej. una necesidad de 2 kWh de red al 50 % carga 3 kWh. Limitado al hueco hasta el SOC máximo (por defecto 0 %) |
 
@@ -62,6 +67,20 @@ El umbral se resuelve así:
 2. Si **Umbral máximo de precio** está vacío, se usa el precio medio diario.
 
 El precio medio del día se calcula automáticamente durante la evaluación de las 00:05 a partir del perfil horario de precios. El objetivo es preservar la batería para las horas más caras del día. Si no hay umbral fijo configurado y la media diaria aún no está disponible, el control de descarga no actúa.
+
+### Suelo de precio de descarga separado
+
+Por defecto un único umbral controla ambos extremos: la batería carga desde la red solo **por debajo** del umbral máximo de precio y descarga solo **por encima**. El **Suelo de precio de descarga** opcional desacopla los dos fijando un suelo de descarga más bajo, abriendo una **banda de reposo** entre ellos:
+
+```
+precio ≥ umbral máximo de precio        → descarga permitida
+suelo < precio < techo                  → reposo (sin carga de red, sin descarga)
+precio ≤ suelo de precio de descarga    → descarga BLOQUEADA
+```
+
+En la banda de reposo la batería no carga desde red ni descarga — pero la **carga con excedente solar sigue funcionando**. Así se evita ciclar la batería por la diferencia marginal de precio en torno a la media. El suelo debe estar **igual o por encima** del techo de carga (se valida al guardar); déjalo vacío para reutilizar el umbral máximo para ambos (el comportamiento de umbral único de arriba).
+
+Ambos umbrales se exponen además como entidades `number` en vivo (**Umbral Máximo de Precio** y **Suelo de Precio de Descarga**) para que las automatizaciones puedan reescribirlos sin entrar al flujo de opciones.
 
 ### Interacción con franjas horarias
 

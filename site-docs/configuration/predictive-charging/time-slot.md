@@ -6,8 +6,12 @@ Charges from the grid during a **fixed time window** (typically cheap overnight 
 
 | Field | Description |
 |---|---|
-| **Time window** | Start and end of the charging slot (e.g. `02:00` – `05:00`) |
+| **Charging window 1** | Start and end of the first charging slot (e.g. `02:00` – `05:00`), plus the days of the week it applies |
+| **Charging windows 2 & 3** | (Optional) Up to two more windows, each with its own start/end and days |
 | **Solar forecast sensor** | Current-day production sensor in kWh (optional) |
+
+!!! note "Up to 3 windows"
+    You can configure 1, 2 or 3 charging windows — useful for a split tariff with both a night and a midday off-peak block. Fill only window 1 for the previous single-window behaviour; each extra window needs **both** a start and an end time (fill both or leave both empty). The consumption-window math treats the union of all configured windows.
 
 !!! danger "Breaking change in v1.6.0"
     The solar forecast sensor field must now point to the **today** sensor (e.g. `sensor.solcast_pv_forecast_forecast_today`), not the tomorrow sensor.

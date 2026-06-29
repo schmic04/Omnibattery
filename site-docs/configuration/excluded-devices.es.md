@@ -47,6 +47,18 @@ El estado del switch se persiste en la entrada de configuración y sobrevive rei
 
 ---
 
+## Slider de % de exclusión
+
+La exclusión no es todo o nada. Cada dispositivo excluido tiene además un slider de **% de exclusión** (`<dispositivo> – Exclusion %`, `number.*_exclusion_pct`, 0–100 %, por defecto `100`) que controla **cuánta** de su demanda se mantiene fuera de la batería:
+
+- `100 %` (por defecto) — el dispositivo se enmascara por completo, igual que antes. La batería no cubre nada de su carga.
+- `0 %` — el dispositivo se trata como carga doméstica normal; la batería lo cubre como cualquier otra cosa.
+- p. ej. `60 %` — el 60 % de la potencia del dispositivo se mantiene fuera de la batería; la batería puede cubrir el 40 % restante.
+
+Esto permite que la batería cubra *parte* de una carga grande en vez de todo o nada — por ejemplo dejar que una batería de 2,5 kW ayude con un cargador VE de 7 kW hasta su parte, en lugar de ignorar el cargador por completo. El slider es por dispositivo y ajustable en tiempo de ejecución.
+
+---
+
 ## Cargador VE sin telemetría de potencia
 
 Algunas integraciones de cargadores de vehículo eléctrico no exponen un sensor de potencia en tiempo real — solo informan del **estado de carga** (p. ej. `Charging`, `Idle`, `Disconnected`). Esta opción está diseñada para esos cargadores.

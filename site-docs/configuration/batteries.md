@@ -1,8 +1,14 @@
 # Battery configuration
 
+## Brand
+
+Each battery is added under a **brand** — **Marstek** (Venus, over Modbus TCP/RTU) or **Zendure** (SolarFlow 2400 AC / AC Pro / AC+, over local HTTP). The brand you pick changes the connection fields below: Marstek asks for the Modbus host/port (or a serial path) and battery version; Zendure auto-detects the model and only needs the device's local IP. The rest of the integration — control loop, sensors, dashboard, predictive charging — is shared.
+
+The fields documented on this page are for **Marstek** batteries. The control and SOC/power sliders behave the same for Zendure; only the connection and a user-set capacity differ.
+
 ## Number of batteries
 
-Select how many Marstek Venus units you have (1–6). The integration will ask you to configure each one separately.
+Select how many battery units you have (1–6). The integration will ask you to configure each one separately.
 
 ![Number of Batteries slider](../assets/screenshots/configuration/battery-slider.png){ width="650"  style="display: block; margin: 0 auto;"}
 

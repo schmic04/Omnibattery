@@ -47,6 +47,16 @@ In systems with multiple batteries at different SOC levels the grid charge is di
 
 ---
 
+## Guaranteed minimum SOC floor
+
+Predictive charging only grid-charges when the day nets to a deficit. On a sunny day the whole-day balance can be positive even though the battery is near empty at dawn — leaving the morning gap (before solar ramps up) covered from the grid at full price, or the battery drained.
+
+The optional **Guaranteed Minimum SOC** slider (Control tab, `0` = off) forces an overnight grid charge to reach **at least** that SOC by the end of the charging window, regardless of the day's net balance. It sizes the deficit to the floor, so it flows through the per-battery target SOC and the dynamic-pricing slot sizing unchanged — the cheapest slots are still chosen to reach it.
+
+It re-triggers with hysteresis: once SOC recovers to the configured floor, charging stops if the floor was the only reason to charge; it re-arms when SOC drops to `floor − 5 %`. Set it via the `number.*_predictive_min_soc_floor` slider, paired with the **Guaranteed Minimum SOC** switch.
+
+---
+
 ## Available modes
 
 | Mode | Description |

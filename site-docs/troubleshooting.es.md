@@ -55,7 +55,7 @@ La integración monitoriza los registros `Alarm Status` y `Fault Status` de la b
 
 **Qué hacer al recibir una notificación:**
 
-1. Consulta el sensor **`System Alarm Status`** en el dispositivo *Marstek Venus System* — sus atributos indican qué batería está afectada y qué condiciones están activas.
+1. Consulta el sensor **`System Alarm Status`** en el dispositivo *Omnibattery System* — sus atributos indican qué batería está afectada y qué condiciones están activas.
 2. Revisa los sensores **Alarm Status** y **Fault Status** individuales en el dispositivo de la batería afectada para ver el estado completo.
 3. Consulta la documentación de Marstek Venus o la app de Marstek para el código de fallo concreto.
 4. Si la condición no se resuelve sola, considera reiniciar la batería o contactar con el soporte de Marstek.
@@ -116,7 +116,7 @@ Para límites de potencia multi-batería informa si la funcionalidad está activ
 **Cómo activarlo:**
 
 1. Ve a **Configuración → Dispositivos y servicios → Omnibattery**.
-2. Selecciona el dispositivo **Marstek Venus System**.
+2. Selecciona el dispositivo **Omnibattery System**.
 3. Busca el sensor **Resumen de Configuración** (está oculto por defecto) y actívalo.
 4. Abre la tarjeta de detalle del sensor y comparte sus atributos (estado + atributos).
 

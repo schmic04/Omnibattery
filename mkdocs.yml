@@ -1,9 +1,9 @@
-site_name: Marstek Venus Energy Manager
-site_description: Home Assistant custom integration for Marstek Venus battery systems
+site_name: Omnibattery
+site_description: Home Assistant custom integration for pluggable solar batteries (Marstek Venus and Zendure SolarFlow)
 site_author: ffunes
-site_url: https://ffunes.github.io/Marstek-Venus-Energy-Manager/
-repo_url: https://github.com/ffunes/Marstek-Venus-Energy-Manager
-repo_name: ffunes/Marstek-Venus-Energy-Manager
+site_url: https://ffunes.github.io/omnibattery/
+repo_url: https://github.com/ffunes/omnibattery
+repo_name: ffunes/omnibattery
 edit_uri: edit/main/site-docs/
 
 docs_dir: site-docs
@@ -90,7 +90,7 @@ plugins:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/ffunes/Marstek-Venus-Energy-Manager
+      link: https://github.com/ffunes/omnibattery
     - icon: fontawesome/solid/mug-hot
       link: https://buymeacoffee.com/ffunes
   version:

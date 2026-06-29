@@ -38,6 +38,7 @@ En vez de ajustar las ganancias a mano, elige un **perfil de ajuste** (`select.*
 | Suave | 0.30 | 0.25 | 600 W | Conservador |
 | Equilibrado | 0.35 | 0.30 | 800 W | Por defecto — vale para la mayoría |
 | Agresivo | 0.55 | 0.45 | 1200 W | Medidor limpio, respuesta rápida |
+| Muy agresivo | 0.75 | 0.45 | 2000 W | Medidor limpio + batería a plena potencia; respuesta más rápida |
 | Personalizado | — | — | — | Manual: ajusta tú los sliders |
 
 - Elegir un perfil escribe sus tres ganancias y las recarga en caliente (sin reinicio).
@@ -104,6 +105,28 @@ El término derivativo se filtra con un paso-bajo (constante de tiempo corta) an
 ### Anti-windup por potencia medida
 
 El controlador asume que cada batería entrega exactamente la potencia comandada. Cuando no puede —por ejemplo por reducción (taper) de SOC/voltaje o por retardo de rampa—, el controlador detecta el déficit sostenido comparando el comando con la potencia AC medida y reancla su línea base interna a la realidad. Así evita que la salida de control «se acumule» (windup) por encima de lo que el hardware entregó realmente, lo que de otro modo causaría un sobreimpulso o una breve exportación a red cuando la carga baja después.
+
+## Protección de relé y de tasa de escritura
+
+Dos sliders opcionales protegen el hardware del traqueteo cuando la red ronda el borde del deadband o un medidor rápido publica ráfagas. Ambos vienen con un valor casi desactivado, así que las instalaciones existentes no cambian.
+
+| Slider | Por defecto | Qué hace |
+|---|---|---|
+| **PD Relay Cooldown** (`number.*_pd_relay_cooldown`, s) | `0` (desactivado) | Tiempo mínimo que la batería sigue activa antes de volver a reposo. Frena el traqueteo de relé durante las rampas solares. El tiempo se cuenta **desde el momento en que se pide el reposo**, así que de verdad se mantiene. Mientras se mantiene corre a la potencia mínima de carga/descarga configurada (o 100 W si es 0). Los desbalances grandes lo saltan. Solo gobierna activo→reposo, no los cambios carga↔descarga. |
+| **PD Min Cycle Interval** (`number.*_pd_min_cycle_interval`, s) | `1` | Limita con qué frecuencia corre el lazo dirigido por eventos — las actualizaciones de red más cercanas que esto se descartan, así un medidor rápido no inunda bridges Modbus lentos (p. ej. Elfin EW11) con ráfagas de escritura. El watchdog de seguridad de 2 s nunca se limita, así que el control nunca se detiene. `0` = desactivado. |
+
+## Modo de seguimiento directo No-PD
+
+Una alternativa **opcional** a la ley de control PD, para quien quiere que la batería siga el sensor de consumo **1:1 en un único ciclo** — sin integral, derivativo, suavizado, limitador de rampa ni histéresis. Actívalo con el switch **No-PD Direct Tracking** (`switch.*_no_pd_mode`); el controlador PD queda intacto mientras esté desactivado (los dos son mutuamente excluyentes en el dashboard).
+
+En cada ciclo reconstruye la carga del hogar a partir de la potencia AC **medida** de la batería (`nueva = medida − error`) en vez del último comando, así se mantiene estable durante la rampa de varios segundos del inversor en lugar de oscilar de extremo a extremo.
+
+Reutiliza el deadband, la potencia mínima de carga/descarga, el min-ON de relé y los sliders de setpoint de red existentes, más una perilla específica del modo:
+
+- **No-PD Command Delay** (`number.*_no_pd_command_delay`, s) — amortigua medidores rápidos colapsando una ráfaga de actualizaciones en un único comando sobre el último valor.
+
+!!! tip "Cuándo usarlo"
+    No-PD encaja con un medidor limpio y rápido donde quieres la respuesta más directa posible y el ajuste PD te sobra. Con un medidor ruidoso, el filtrado del controlador PD suele ser mejor opción.
 
 ## Exclusión por función de reserva
 

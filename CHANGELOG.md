@@ -1,6 +1,6 @@
 # Changelog
 
-## [3.0.0b1] - 2026-06-27
+## [1.0.0b1] - 2026-06-29
 
 > ### ⚠️ Major change — the integration is now “Omnibattery”
 > Renamed from *Marstek Venus Energy Manager*; it is multi-brand now (Marstek + Zendure). The HA domain changed (`marstek_venus_energy_manager` → `omnibattery`), so the upgrade needs **one manual step**. **Everything is preserved** — configuration, entity IDs (they stay `marstek_venus_*`), recorder history, long-term statistics, dashboards and automations.
@@ -53,6 +53,15 @@
 ### Internal
 - **Source reorganisation into subpackages**: 18 modules moved out of the integration root into `sensors/`, `control/`, `tracking/`, `infra/`. Root keeps only the HA-required platform files. No behaviour change.
 - **Driver abstraction layer**: all hardware access goes through a brand-agnostic `BatteryDriver`; the control and platform layers read hardware traits from `coordinator.capabilities` instead of branching on battery version. This is what makes the integration multi-brand (Marstek + Zendure). [`drivers/`](custom_components/omnibattery/drivers/).
+
+---
+
+*History inherited from [Marstek Venus Energy Manager](https://github.com/ffunes/marstek-venus-energy-manager) (predecessor integration)*
+
+## [2.0.6] - 2026-06-27
+
+### Added
+- **Config backup for seamless rebrand migration**: on setup and on every options change, the integration writes each config entry's data and options to a HA Store under the fixed key marstek_venus_energy_manager.config_backup. The key is domain-independent and survives a config-entry deletion, so the upcoming Omnibattery build can restore the full configuration even when the user removes the integration manually before reinstalling. config_backup.py, __init__.py.
 
 ## [2.0.5] - 2026-06-20
 

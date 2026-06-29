@@ -13,15 +13,15 @@
     "frontend",
     "panel_custom"
   ],
-  "documentation": "https://github.com/ffunes/marstek-venus-energy-manager",
+  "documentation": "https://github.com/ffunes/omnibattery",
   "integration_type": "device",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/ffunes/marstek-venus-energy-manager/issues",
+  "issue_tracker": "https://github.com/ffunes/omnibattery/issues",
   "requirements": [
     "pymodbus>=3.5.0",
     "pyserial>=3.5"
   ],
-  "version": "3.0.0b1",
+  "version": "1.0.0b1",
   "zeroconf": [
     "_modbus._tcp.local."
   ]

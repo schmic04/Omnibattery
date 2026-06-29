@@ -70,6 +70,51 @@ Search for "Omnibattery", install, and restart Home Assistant.
 
 Download the release zip, extract the `omnibattery` folder, copy it to your Home Assistant `custom_components` directory, and restart.
 
+### Upgrading from Marstek Venus Energy Manager
+
+Everything is preserved: all configuration (PD tuning, time slots, thresholds), entity IDs (`marstek_venus_*`), recorder history, long-term statistics, dashboards, automations, and daily energy counters.
+
+> [!IMPORTANT]
+> You must pass through **v2.0.6** of the old *Marstek Venus Energy Manager* integration before switching to Omnibattery. That release writes a configuration backup to HA's `.storage` that survives the domain switch. Skipping it means you may have to reconfigure everything from scratch if HACS deletes the old entries during the switch.
+
+> [!TIP]
+> Take a full Home Assistant backup before starting (**Settings → System → Backups → Create backup**).
+
+**Step 1 — Write the backup while still on the old domain**
+
+In HACS, update **Marstek Venus Energy Manager** to **v2.0.6** and restart Home Assistant. The integration loads and silently writes a backup of your entire configuration.
+
+**Step 2 — Switch to Omnibattery**
+
+Add the Omnibattery repository in HACS and install it, then restart.
+
+**Step 3 — Run the migration**
+
+After the restart, the old integration will appear broken or missing — this is expected. Go to:
+
+**Settings → Devices & Services → Add Integration → Omnibattery**
+
+The setup flow detects your existing configuration and presents a confirmation screen. Confirm to run the migration. It will:
+- Recreate each config entry under the new `omnibattery` domain
+- Repoint the entity registry without changing any entity ID or unique ID
+- Copy the integration's `.storage` files (daily energy totals, accumulators, balance history)
+
+**Step 4 — Hard-refresh the browser**
+
+Press **Ctrl+F5** so the renamed sidebar panel loads correctly.
+
+---
+
+**Recovery: if you accidentally deleted the integration entirely**
+
+If the old config entries were deleted from *Settings → Devices & Services* before migrating, the backup written in Step 1 still survives. Go to **Add Integration → Omnibattery** — the flow will detect no live legacy entries but will find the backup and offer to restore it. Confirm to recreate everything from the backup.
+
+---
+
+**Optional: rename system entities to `omnibattery_*`**
+
+After migration, system entities keep their old `marstek_venus_system_*` IDs. If you want to rename them, go to **Settings → Devices & Services → Omnibattery → ⋯ → Recreate entity IDs**. This renames them in-place with history preserved, but any automations, templates, or Energy dashboard entries that reference the old IDs must be updated manually.
+
 ## Testbed Configuration
 
 - **Batteries**: 1× Marstek Venus E v2, 1x Marstek Venus E v3 and 1x Zendure Solarflow 2400 AC+.

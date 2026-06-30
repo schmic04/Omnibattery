@@ -74,6 +74,7 @@ def _controller(**overrides):
         _forecast_grace_s=300,
         _charge_delay_forecast_cache=None,
         _charge_delay_balance_needs_charge=False,
+        _charge_delay_balance_deadband_kwh=0.5,
         _daily_solar_energy_kwh=0.0,
         _delay_safety_margin_h=0.5,
         _delay_last_log_time=0,

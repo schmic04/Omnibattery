@@ -28,7 +28,6 @@ from homeassistant.util import dt as dt_util
 
 from ..const import (
     CHARGE_EFFICIENCY,
-    DELAY_BALANCE_DEADBAND_KWH,
     DELAY_SAFETY_FACTOR,
     DELAY_SOC_SETPOINT_HYSTERESIS,
     DOMAIN,
@@ -361,10 +360,11 @@ class ChargeDelayManager:
             # energy SCHEDULING math, but on this all-or-nothing gate it turns a
             # balanced day (raw forecast ~= consumption) into a false deficit and a
             # latched pre-dawn unlock (#4). A small deadband absorbs sensor noise so
-            # a near-balanced day still holds for the cheap window.
+            # a near-balanced day still holds for the cheap window. Runtime-tunable.
+            deadband_kwh = ctrl._charge_delay_balance_deadband_kwh
             ctrl._charge_delay_balance_needs_charge = (
                 (usable_energy_kwh + raw_forecast)
-                < (avg_consumption_kwh - DELAY_BALANCE_DEADBAND_KWH)
+                < (avg_consumption_kwh - deadband_kwh)
             )
             ctrl._charge_delay_forecast_cache = forecast_today
             _LOGGER.info(
@@ -374,7 +374,7 @@ class ChargeDelayManager:
                 "initialised" if prev_cache is None else "changed",
                 raw_forecast, forecast_today,
                 usable_energy_kwh, raw_forecast, usable_energy_kwh + raw_forecast,
-                avg_consumption_kwh, DELAY_BALANCE_DEADBAND_KWH,
+                avg_consumption_kwh, deadband_kwh,
                 "grid needed (unlock delay)" if ctrl._charge_delay_balance_needs_charge else "solar sufficient (keep delay)",
             )
 

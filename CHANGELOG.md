@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.0b2] - 2026-06-30
+
+### Fixed
+- **Charge delay no longer unlocks early on balanced-forecast days** (#4): the binary "is grid needed today?" gate compared the raw solar forecast (instead of the 0.85 scheduling haircut, which flipped a balanced day into a false deficit) against a configurable deadband. A genuine grid-deficit day now holds the unlock until the cheapest import hour before solar is due, rather than releasing at the pre-dawn price peak. [`control/charge_delay.py`](custom_components/omnibattery/control/charge_delay.py), [`pricing/engine.py`](custom_components/omnibattery/pricing/engine.py).
+
+### Added
+- **Charge Delay Balance Deadband slider** (kWh, default 0.5): runtime tolerance on the charge-delay energy balance — the delay only unlocks once the solar+stored shortfall exceeds it. [`number.py`](custom_components/omnibattery/number.py).
+
 ## [1.0.0b1] - 2026-06-29
 
 > ### ⚠️ Major change — new repository, integration renamed to “Omnibattery”

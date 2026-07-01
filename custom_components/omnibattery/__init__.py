@@ -3405,14 +3405,18 @@ class ChargeDischargeController:
             self._non_responsive.clear(coordinator)
             return
         reason = "standby_no_delivery" if is_standby else "non_delivery"
-        just_excluded = self._non_responsive.record_non_delivery(
+        outcome = self._non_responsive.record_non_delivery(
             coordinator, discharge_power, actual_abs,
             reason=reason, retry_attempted=attempt > 0,
         )
-        # One-shot wake nudge, only at the moment of exclusion — a last-ditch
-        # RS485 re-assert before dropping it from the pool (no-op on drivers
-        # without RS485 control, e.g. Zendure).
-        if just_excluded:
+        # First threshold-cross: a one-shot wake nudge (reconnect/re-assert), but
+        # the tracker resets the fail counter instead of excluding — the battery
+        # stays in the pool so the very next real PD cycle proves whether the
+        # wake worked, instead of paying a 5-minute cooldown for nothing if it
+        # did. Only a second consecutive threshold-cross in the same episode
+        # (post-wake) actually excludes it, and that one gets no further wake
+        # (no-op on drivers without RS485 control, e.g. Zendure).
+        if outcome == "wake":
             woke = await self._attempt_wake(coordinator, is_standby=is_standby)
             self._non_responsive.set_wake_attempted(coordinator, woke)
 

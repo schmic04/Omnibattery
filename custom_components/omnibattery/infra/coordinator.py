@@ -6,6 +6,7 @@ from datetime import timedelta, datetime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers import entity_registry
+from homeassistant.util import dt as dt_util
 
 from ..const import (
     DOMAIN,
@@ -22,6 +23,29 @@ from ..drivers.base import SetpointResult
 from .alarm_notifier import AlarmNotifier
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def is_untrusted_energy_reading(key: str, value, prev) -> bool:
+    """True if a total_increasing energy reading must be discarded as noise.
+
+    The battery occasionally returns a partial 32-bit read mid-update, yielding
+    a value far below the real counter (e.g. 50 kWh instead of 491 kWh) or a
+    garbled exact 0. A non-zero value below 90% of the last known value is
+    physically impossible and must be discarded. A drop to exactly 0 is only
+    trusted for "daily" counters within a few minutes of local midnight (their
+    real reset window) - anywhere else it's comm noise, not a reset, and HA's
+    total_increasing statistics would double-count the energy once the real
+    reading reappears.
+    """
+    if not isinstance(value, (int, float)) or not isinstance(prev, (int, float)) or prev <= 0:
+        return False
+    if 0 < value < prev * 0.9:
+        return True
+    if value == 0:
+        local_now = dt_util.now()
+        is_midnight_reset = "daily" in key and local_now.hour == 0 and local_now.minute < 5
+        return not is_midnight_reset
+    return False
 
 
 class MarstekVenusDataUpdateCoordinator(DataUpdateCoordinator):
@@ -538,23 +562,13 @@ class MarstekVenusDataUpdateCoordinator(DataUpdateCoordinator):
                     if "precision" in sensor:
                         value = round(value, sensor["precision"])
 
-                # Guard against firmware noise on lifetime energy counters.
-                # The battery occasionally returns a partial 32-bit read mid-update,
-                # yielding a value far below the real counter (e.g. 50 kWh instead of
-                # 491 kWh).  A value that is non-zero but less than 90% of the last
-                # known value is physically impossible for total_increasing sensors
-                # and must be discarded.  Drops to exactly 0 (daily counter reset,
-                # factory reset) are still accepted.
-                if (
-                    sensor.get("state_class") == "total_increasing"
-                    and isinstance(value, (int, float))
-                    and value > 0
-                ):
+                # Guard against firmware noise on total_increasing energy counters.
+                if sensor.get("state_class") == "total_increasing":
                     prev = self.data.get(key) if self.data else None
-                    if isinstance(prev, (int, float)) and prev > 0 and value < prev * 0.9:
+                    if is_untrusted_energy_reading(key, value, prev):
                         _LOGGER.debug(
                             "[%s] Discarding implausible backward jump for '%s': "
-                            "%.2f -> %.2f (< 90%% of previous). Likely firmware noise.",
+                            "%.2f -> %.2f. Likely firmware noise.",
                             self.name, key, prev, value,
                         )
                         continue

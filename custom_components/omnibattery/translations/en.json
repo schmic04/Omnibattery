@@ -327,6 +327,29 @@
           "solar_forecast_sensor": "Sensor providing solar production forecast in kWh (e.g., Solcast). Not required if you already configured this sensor in the initial setup step — it will be used automatically."
         }
       },
+      "temp_charge_limit": {
+        "title": "Temperature charge limit",
+        "description": "Reduce charge power when a battery gets hot? Above a temperature limit charging is throttled proportionally and restored as the battery cools.",
+        "data": {
+          "configure_temp_charge_limit": "Configure temperature charge limit"
+        }
+      },
+      "temp_charge_limit_config": {
+        "title": "Temperature charge limit configuration",
+        "description": "Set the temperature at which charging starts to throttle, the band over which it ramps down, and the minimum charge power (as a percentage of normal).",
+        "data": {
+          "temp_charge_limit_c": "Temperature limit (°C)",
+          "temp_charge_limit_band_c": "Ramp band (°C)",
+          "temp_charge_limit_floor_pct": "Minimum charge power (%)",
+          "temp_limit_apply_discharge": "Also throttle discharge"
+        },
+        "data_description": {
+          "temp_charge_limit_c": "Charging runs at full power at or below this temperature; above it the derate begins.",
+          "temp_charge_limit_band_c": "Temperature range above the limit over which charge power ramps down to the minimum.",
+          "temp_charge_limit_floor_pct": "Charge power at the limit plus the band, as a percentage of the normal charge ceiling. 0% stops charging entirely when very hot.",
+          "temp_limit_apply_discharge": "Apply the same temperature derate to discharge power. Discharge tolerates heat better, so this shares the charge threshold as a compromise; mainly it keeps discharge under the BMS hard cutoff."
+        }
+      },
       "capacity_protection": {
         "title": "Peak Shaving Mode",
         "description": "When enabled, if battery SOC drops below a threshold, the system conserves energy by only discharging to offset consumption above a peak limit.",
@@ -483,6 +506,7 @@
           "predictive_charging": "Predictive charging",
           "weekly_full_charge": "Weekly full charge",
           "charge_delay": "Solar charge delay",
+          "temp_charge_limit": "Temperature charge limit",
           "capacity_protection": "Capacity protection",
           "hourly_balance": "Hourly net balance",
           "pd_advanced": "PD controller (advanced)"
@@ -810,6 +834,29 @@
           "solar_forecast_sensor": "Sensor providing solar production forecast in kWh (e.g., Solcast). Not required if you already configured this sensor in the initial setup step — it will be used automatically."
         }
       },
+      "temp_charge_limit": {
+        "title": "Temperature charge limit",
+        "description": "Reduce charge power when a battery gets hot? Above a temperature limit charging is throttled proportionally and restored as the battery cools.",
+        "data": {
+          "configure_temp_charge_limit": "Configure temperature charge limit"
+        }
+      },
+      "temp_charge_limit_config": {
+        "title": "Temperature charge limit configuration",
+        "description": "Set the temperature at which charging starts to throttle, the band over which it ramps down, and the minimum charge power (as a percentage of normal).",
+        "data": {
+          "temp_charge_limit_c": "Temperature limit (°C)",
+          "temp_charge_limit_band_c": "Ramp band (°C)",
+          "temp_charge_limit_floor_pct": "Minimum charge power (%)",
+          "temp_limit_apply_discharge": "Also throttle discharge"
+        },
+        "data_description": {
+          "temp_charge_limit_c": "Charging runs at full power at or below this temperature; above it the derate begins.",
+          "temp_charge_limit_band_c": "Temperature range above the limit over which charge power ramps down to the minimum.",
+          "temp_charge_limit_floor_pct": "Charge power at the limit plus the band, as a percentage of the normal charge ceiling. 0% stops charging entirely when very hot.",
+          "temp_limit_apply_discharge": "Apply the same temperature derate to discharge power. Discharge tolerates heat better, so this shares the charge threshold as a compromise; mainly it keeps discharge under the BMS hard cutoff."
+        }
+      },
       "capacity_protection": {
         "title": "Capacity Protection Mode",
         "description": "When enabled, if battery SOC drops below a threshold, the system conserves energy by only discharging to offset consumption above a peak limit.",
@@ -968,6 +1015,12 @@
       },
       "charge_delay": {
         "name": "Charge Delay"
+      },
+      "temp_charge_limit": {
+        "name": "Temperature Charge Limit"
+      },
+      "temp_charge_limit_discharge": {
+        "name": "Temperature Discharge Limit"
       },
       "weekly_full_charge_delay": {
         "name": "Delay Weekly Full Charge"
@@ -1455,6 +1508,15 @@
       },
       "delay_soc_setpoint": {
         "name": "Charge Delay SOC Setpoint"
+      },
+      "temp_charge_limit_c": {
+        "name": "Temperature Charge Limit"
+      },
+      "temp_charge_limit_band_c": {
+        "name": "Temperature Charge Limit Band"
+      },
+      "temp_charge_limit_floor_pct": {
+        "name": "Temperature Charge Limit Floor"
       },
       "capacity_protection_limit": {
         "name": "Peak Shaving Limit"

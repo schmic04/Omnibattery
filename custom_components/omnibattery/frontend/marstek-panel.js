@@ -83,6 +83,7 @@ const I18N = {
     bcMaxCharge: "Max charge", bcMaxDischarge: "Max discharge",
     bcChargeToSoc: "Charge to SOC", bcChargeHysteresis: "Charge hysteresis", bcBackup: "Backup function", bcOffgridMode: "Off-grid mode",
     secManual: "Manual mode", itemEnable: "Enable",
+    secTempLimit: "Temperature charge limit", itemTempLimitC: "Temperature limit", itemTempLimitBand: "Ramp band", itemTempLimitFloor: "Minimum charge power", itemTempApplyDischarge: "Also throttle discharge",
     itemMaxContracted: "Max contracted power", itemSolarSafety: "Solar safety margin", itemGridChargeMargin: "Grid charge margin", itemMinSocFloorEnable: "SOC floor", itemMinSocFloor: "Guaranteed minimum SOC",
     itemSocThreshold: "SOC threshold", itemPeakLimit: "Peak limit",
     itemDelaySafety: "Safety margin", itemDelaySoc: "Delay target SOC", itemDelayDeadband: "Balance deadband",
@@ -147,6 +148,7 @@ const I18N = {
     bcMaxCharge: "Máx. carga", bcMaxDischarge: "Máx. descarga",
     bcChargeToSoc: "Cargar hasta SOC", bcChargeHysteresis: "Histéresis de carga", bcBackup: "Función de respaldo", bcOffgridMode: "Modo off-grid",
     secManual: "Modo manual", itemEnable: "Activar",
+    secTempLimit: "Límite de carga por temperatura", itemTempLimitC: "Límite de temperatura", itemTempLimitBand: "Banda de reducción", itemTempLimitFloor: "Potencia de carga mínima", itemTempApplyDischarge: "Reducir también la descarga",
     itemMaxContracted: "Potencia contratada máx.", itemSolarSafety: "Margen de seguridad solar", itemGridChargeMargin: "Margen de carga de red", itemMinSocFloorEnable: "Suelo de SOC", itemMinSocFloor: "SOC mínimo garantizado",
     itemSocThreshold: "Umbral de SOC", itemPeakLimit: "Límite de pico",
     itemDelaySafety: "Margen de seguridad", itemDelaySoc: "SOC objetivo de retardo", itemDelayDeadband: "Banda muerta de balance",
@@ -209,6 +211,7 @@ const I18N = {
     bcMaxCharge: "Màx. càrrega", bcMaxDischarge: "Màx. descàrrega",
     bcChargeToSoc: "Carregar fins a SOC", bcChargeHysteresis: "Histèresi de càrrega", bcBackup: "Funció de reserva", bcOffgridMode: "Mode fora de xarxa",
     secManual: "Mode manual", itemEnable: "Activar",
+    secTempLimit: "Límit de càrrega per temperatura", itemTempLimitC: "Límit de temperatura", itemTempLimitBand: "Banda de reducció", itemTempLimitFloor: "Potència de càrrega mínima", itemTempApplyDischarge: "Reduir també la descàrrega",
     itemMaxContracted: "Potència contractada màx.", itemSolarSafety: "Marge de seguretat solar", itemGridChargeMargin: "Marge de càrrega de xarxa", itemMinSocFloorEnable: "Terra de SOC", itemMinSocFloor: "SOC mínim garantit",
     itemSocThreshold: "Llindar de SOC", itemPeakLimit: "Límit de pic",
     itemDelaySafety: "Marge de seguretat", itemDelaySoc: "SOC objectiu de retard", itemDelayDeadband: "Banda morta de balanç",
@@ -271,6 +274,7 @@ const I18N = {
     bcMaxCharge: "Max. Ladeleistung", bcMaxDischarge: "Max. Entladeleistung",
     bcChargeToSoc: "Laden bis SOC", bcChargeHysteresis: "Ladehysterese", bcBackup: "Backup-Funktion", bcOffgridMode: "Inselnetz-Modus",
     secManual: "Manueller Modus", itemEnable: "Aktivieren",
+    secTempLimit: "Temperaturbasierte Ladebegrenzung", itemTempLimitC: "Temperaturgrenze", itemTempLimitBand: "Drosselbereich", itemTempLimitFloor: "Minimale Ladeleistung", itemTempApplyDischarge: "Auch Entladung drosseln",
     itemMaxContracted: "Max. Vertragsleistung", itemSolarSafety: "Sicherheitspuffer Solar", itemGridChargeMargin: "Netzladungs-Marge", itemMinSocFloorEnable: "SOC-Untergrenze", itemMinSocFloor: "Garantierter Mindest-SOC",
     itemSocThreshold: "SOC-Schwelle", itemPeakLimit: "Spitzenlimit",
     itemDelaySafety: "Sicherheitspuffer", itemDelaySoc: "Verzögerungs-Ziel-SOC", itemDelayDeadband: "Bilanz-Totband",
@@ -333,6 +337,7 @@ const I18N = {
     bcMaxCharge: "Charge max.", bcMaxDischarge: "Décharge max.",
     bcChargeToSoc: "Charger jusqu'à SOC", bcChargeHysteresis: "Hystérésis de charge", bcBackup: "Fonction de secours", bcOffgridMode: "Mode hors-réseau",
     secManual: "Mode manuel", itemEnable: "Activer",
+    secTempLimit: "Limite de charge par température", itemTempLimitC: "Limite de température", itemTempLimitBand: "Plage de réduction", itemTempLimitFloor: "Puissance de charge minimale", itemTempApplyDischarge: "Réduire aussi la décharge",
     itemMaxContracted: "Puissance contractuelle max.", itemSolarSafety: "Marge de sécurité solaire", itemGridChargeMargin: "Marge de charge réseau", itemMinSocFloorEnable: "Plancher SOC", itemMinSocFloor: "SOC minimum garanti",
     itemSocThreshold: "Seuil SOC", itemPeakLimit: "Limite de pointe",
     itemDelaySafety: "Marge de sécurité", itemDelaySoc: "SOC cible du délai", itemDelayDeadband: "Bande morte de bilan",
@@ -395,6 +400,7 @@ const I18N = {
     bcMaxCharge: "Max. laden", bcMaxDischarge: "Max. ontladen",
     bcChargeToSoc: "Laden tot SOC", bcChargeHysteresis: "Laadhysterese", bcBackup: "Back-upfunctie", bcOffgridMode: "Off-grid-modus",
     secManual: "Handmatige modus", itemEnable: "Inschakelen",
+    secTempLimit: "Temperatuurbegrenzing laden", itemTempLimitC: "Temperatuurlimiet", itemTempLimitBand: "Afbouwband", itemTempLimitFloor: "Minimaal laadvermogen", itemTempApplyDischarge: "Ook ontladen terugregelen",
     itemMaxContracted: "Max. gecontracteerd vermogen", itemSolarSafety: "Veiligheidsmarge zon", itemGridChargeMargin: "Netladingsmarge", itemMinSocFloorEnable: "SOC-vloer", itemMinSocFloor: "Gegarandeerde min. SOC",
     itemSocThreshold: "SOC-drempel", itemPeakLimit: "Pieklimiet",
     itemDelaySafety: "Veiligheidsmarge", itemDelaySoc: "Doel-SOC vertraging", itemDelayDeadband: "Balans dode band",
@@ -710,6 +716,17 @@ const SYS_SECTIONS = [
       { key: "capacity_protection_limit", lk: "itemPeakLimit", icon: "mdi:flash" },
     ],
   },
+  {
+    tk: "secTempLimit",
+    icon: "mdi:thermometer-alert",
+    items: [
+      { key: "temp_charge_limit", domain: "switch", lk: "itemEnable", icon: "mdi:thermometer-alert", gate: true },
+      { key: "temp_charge_limit_c", lk: "itemTempLimitC", icon: "mdi:thermometer-high" },
+      { key: "temp_charge_limit_band_c", lk: "itemTempLimitBand", icon: "mdi:thermometer-lines" },
+      { key: "temp_charge_limit_floor_pct", lk: "itemTempLimitFloor", icon: "mdi:battery-charging-low" },
+      { key: "temp_charge_limit_discharge", domain: "switch", lk: "itemTempApplyDischarge", icon: "mdi:battery-arrow-down" },
+    ],
+  },
 ];
 
 // Control tab layout, by section `tk`. Sections absent from the live registry
@@ -724,7 +741,7 @@ const SYS_LAYOUT = [
       ["secManual", "secWeeklyFull"],
       ["diagPredictive", "diagChargeDelay"],
       ["secHourly", "secSysLimits"],
-      ["diagPeak", null],
+      ["diagPeak", "secTempLimit"],
     ],
   },
   { col: ["secSlots"] },
@@ -790,6 +807,7 @@ const SYS_HELP = {
     delay_soc_setpoint: "The SOC the battery must reach before the solar delay kicks in. Minimum is 12 % — the Venus battery minimum discharge SOC.",
     capacity_protection_soc_threshold: "When average battery SOC drops below this value, capacity protection activates. The battery will stop discharging for normal consumption and only cover peaks above the limit.",
     capacity_protection_limit: "Grid import power threshold. When house consumption exceeds this value and protection is active, the battery discharges only the excess above this limit.",
+    secTempLimit: "When enabled, charge power is reduced when a battery gets hot: full power at or below the temperature limit, ramping down to the minimum over the band, and back up as it cools.",
   },
   es: {
     secManual: "Cuando está ACTIVADO, el control automático (PD, carga predictiva, franjas horarias, reducción de picos…) se pausa y todas las baterías se ponen a 0 W (en reposo). DESACTÍVALO para reanudar el control automático.",
@@ -833,6 +851,7 @@ const SYS_HELP = {
     delay_soc_setpoint: "SOC mínimo que debe alcanzar la batería antes de que el retraso solar entre en funcionamiento. El valor mínimo es el 12 % (SOC mínimo de descarga de las baterías Venus).",
     capacity_protection_soc_threshold: "Cuando el SOC medio de las baterías baje de este valor, se activa la reducción de picos. La batería dejará de descargar para consumo normal y solo cubrirá picos por encima del límite.",
     capacity_protection_limit: "Umbral de potencia de importación de red. Cuando el consumo de la casa supere este valor y la reducción de picos esté activa, la batería solo descargará el exceso por encima de este límite.",
+    secTempLimit: "Cuando está activado, la potencia de carga se reduce cuando una batería se calienta: plena potencia al límite de temperatura o por debajo, bajando hasta el mínimo a lo largo de la banda y subiendo de nuevo al enfriarse.",
   },
   ca: {
     secManual: "Quan està ACTIVAT, el control automàtic (PD, càrrega predictiva, franges horàries, reducció de pics…) es pausa i totes les bateries es posen a 0 W (en repòs). DESACTIVA'L per reprendre el control automàtic.",
@@ -875,6 +894,7 @@ const SYS_HELP = {
     delay_soc_setpoint: "SOC mínim que ha d'assolir la bateria abans que el retard solar entri en funcionament. El valor mínim és el 12 % (SOC mínim de descàrrega de les bateries Venus).",
     capacity_protection_soc_threshold: "Quan el SOC mitjà de les bateries baixi d'aquest valor, s'activa la reducció de pics. La bateria deixarà de descarregar per a consum normal i només cobrirà pics per sobre del límit.",
     capacity_protection_limit: "Llindar de potència d'importació de xarxa. Quan el consum de la casa superi aquest valor i la reducció de pics estigui activa, la bateria només descarregarà l'excés per sobre d'aquest límit.",
+    secTempLimit: "Quan està activat, la potència de càrrega es redueix quan una bateria s'escalfa: plena potència al límit de temperatura o per sota, baixant fins al mínim al llarg de la banda i pujant de nou en refredar-se.",
   },
   de: {
     secManual: "Wenn EIN, wird die automatische Regelung (PD, prädiktives Laden, Zeitfenster, Lastspitzenkappung…) pausiert und jede Batterie auf 0 W (Leerlauf) gesetzt. Schalte AUS, um die automatische Regelung fortzusetzen.",
@@ -917,6 +937,7 @@ const SYS_HELP = {
     delay_soc_setpoint: "Der SOC, den die Batterie erreichen muss, bevor die Solarverzögerung greift. Minimum ist 12 % — der minimale Entlade-SOC der Venus-Batterie.",
     capacity_protection_soc_threshold: "Wenn der durchschnittliche Batterie-SOC unter diesen Wert fällt, wird die Kapazitätsschutzfunktion aktiviert. Die Batterie entlädt nicht mehr für den normalen Verbrauch und deckt nur Spitzen über dem Limit ab.",
     capacity_protection_limit: "Netzimport-Leistungsschwelle. Wenn der Hausverbrauch diesen Wert überschreitet und der Schutz aktiv ist, entlädt die Batterie nur den Überschuss über diesem Limit.",
+    secTempLimit: "Wenn aktiviert, wird die Ladeleistung reduziert, wenn eine Batterie heiß wird: volle Leistung an oder unter der Temperaturgrenze, absinkend bis zum Minimum über den Bereich und wieder ansteigend beim Abkühlen.",
   },
   fr: {
     secManual: "Quand ACTIVÉ, le contrôle automatique (PD, charge prédictive, plages horaires, écrêtage des pics…) est mis en pause et chaque batterie est réglée à 0 W (repos). DÉSACTIVE-le pour reprendre le contrôle automatique.",
@@ -959,6 +980,7 @@ const SYS_HELP = {
     delay_soc_setpoint: "Le SOC que la batterie doit atteindre avant que le délai solaire ne s'active. Le minimum est 12 % — le SOC de décharge minimal de la batterie Venus.",
     capacity_protection_soc_threshold: "Quand le SOC moyen des batteries descend sous cette valeur, l'écrêtage des pics s'active. La batterie cesse de décharger pour la consommation normale et ne couvre que les pics au-dessus de la limite.",
     capacity_protection_limit: "Seuil de puissance d'import réseau. Quand la consommation de la maison dépasse cette valeur et que la protection est active, la batterie ne décharge que l'excédent au-dessus de cette limite.",
+    secTempLimit: "Lorsque activé, la puissance de charge est réduite quand une batterie chauffe : pleine puissance à la limite de température ou en dessous, diminuant jusqu'au minimum sur la plage, puis remontant au refroidissement.",
   },
   nl: {
     secManual: "Wanneer AAN, wordt de automatische regeling (PD, voorspellend laden, tijdvensters, piekafvlakking…) gepauzeerd en wordt elke batterij op 0 W (rust) gezet. Zet UIT om de automatische regeling te hervatten.",
@@ -1001,6 +1023,7 @@ const SYS_HELP = {
     delay_soc_setpoint: "De SOC die de batterij moet bereiken voordat de zonnevertraging ingaat. Minimum is 12 % — de minimale ontlaad-SOC van de Venus-batterij.",
     capacity_protection_soc_threshold: "Wanneer de gemiddelde batterij-SOC onder deze waarde zakt, wordt capaciteitsbescherming geactiveerd. De batterij stopt met ontladen voor normaal verbruik en dekt alleen pieken boven de limiet.",
     capacity_protection_limit: "Netimport-vermogensdrempel. Wanneer het huisverbruik deze waarde overschrijdt en de bescherming actief is, ontlaadt de batterij alleen het overschot boven deze limiet.",
+    secTempLimit: "Indien ingeschakeld wordt het laadvermogen verlaagd als een batterij warm wordt: vol vermogen op of onder de temperatuurlimiet, aflopend tot het minimum over de band en weer oplopend bij afkoelen.",
   },
 };
 

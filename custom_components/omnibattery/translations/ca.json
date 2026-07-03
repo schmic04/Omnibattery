@@ -333,6 +333,29 @@
           "solar_forecast_sensor": "Sensor que proporciona la predicció de producció solar en kWh (ex: Solcast). No cal si ja has configurat aquest sensor al pas inicial: s'utilitzarà automàticament."
         }
       },
+      "temp_charge_limit": {
+        "title": "Límit de càrrega per temperatura",
+        "description": "Voleu reduir la potència de càrrega quan una bateria s'escalfa? Per damunt d'un límit de temperatura la càrrega es redueix progressivament i es restableix quan la bateria es refreda.",
+        "data": {
+          "configure_temp_charge_limit": "Configurar el límit de càrrega per temperatura"
+        }
+      },
+      "temp_charge_limit_config": {
+        "title": "Configuració del límit de càrrega per temperatura",
+        "description": "Definiu la temperatura a què la càrrega comença a reduir-se, la banda en què disminueix i la potència de càrrega mínima (com a percentatge de la normal).",
+        "data": {
+          "temp_charge_limit_c": "Límit de temperatura (°C)",
+          "temp_charge_limit_band_c": "Banda de reducció (°C)",
+          "temp_charge_limit_floor_pct": "Potència de càrrega mínima (%)",
+          "temp_limit_apply_discharge": "Reduir també la descàrrega"
+        },
+        "data_description": {
+          "temp_charge_limit_c": "La càrrega funciona a plena potència a aquesta temperatura o per sota; per damunt comença la reducció.",
+          "temp_charge_limit_band_c": "Rang de temperatura per damunt del límit en què la potència de càrrega baixa fins al mínim.",
+          "temp_charge_limit_floor_pct": "Potència de càrrega al límit més la banda, com a percentatge del màxim de càrrega normal. 0% atura la càrrega completament quan fa molta calor.",
+          "temp_limit_apply_discharge": "Aplica la mateixa reducció per temperatura a la potència de descàrrega. La descàrrega tolera millor la calor, així que comparteix el llindar de càrrega com a compromís; sobretot manté la descàrrega per sota del tall dur del BMS."
+        }
+      },
       "capacity_protection": {
         "title": "Mode de reducció de pics",
         "description": "Si s'activa, quan el SOC de la bateria baixi d'un llindar, el sistema conservarà energia descarregant només per cobrir consum que superi un límit pic.",
@@ -489,6 +512,7 @@
           "predictive_charging": "Càrrega predictiva",
           "weekly_full_charge": "Càrrega completa setmanal",
           "charge_delay": "Retard de càrrega solar",
+          "temp_charge_limit": "Límit de càrrega per temperatura",
           "capacity_protection": "Protecció de capacitat",
           "hourly_balance": "Balanç net horari",
           "pd_advanced": "Controlador PD (avançat)"
@@ -822,6 +846,29 @@
           "solar_forecast_sensor": "Sensor que proporciona la predicció de producció solar en kWh (ex: Solcast). No cal si ja has configurat aquest sensor al pas inicial: s'utilitzarà automàticament."
         }
       },
+      "temp_charge_limit": {
+        "title": "Límit de càrrega per temperatura",
+        "description": "Voleu reduir la potència de càrrega quan una bateria s'escalfa? Per damunt d'un límit de temperatura la càrrega es redueix progressivament i es restableix quan la bateria es refreda.",
+        "data": {
+          "configure_temp_charge_limit": "Configurar el límit de càrrega per temperatura"
+        }
+      },
+      "temp_charge_limit_config": {
+        "title": "Configuració del límit de càrrega per temperatura",
+        "description": "Definiu la temperatura a què la càrrega comença a reduir-se, la banda en què disminueix i la potència de càrrega mínima (com a percentatge de la normal).",
+        "data": {
+          "temp_charge_limit_c": "Límit de temperatura (°C)",
+          "temp_charge_limit_band_c": "Banda de reducció (°C)",
+          "temp_charge_limit_floor_pct": "Potència de càrrega mínima (%)",
+          "temp_limit_apply_discharge": "Reduir també la descàrrega"
+        },
+        "data_description": {
+          "temp_charge_limit_c": "La càrrega funciona a plena potència a aquesta temperatura o per sota; per damunt comença la reducció.",
+          "temp_charge_limit_band_c": "Rang de temperatura per damunt del límit en què la potència de càrrega baixa fins al mínim.",
+          "temp_charge_limit_floor_pct": "Potència de càrrega al límit més la banda, com a percentatge del màxim de càrrega normal. 0% atura la càrrega completament quan fa molta calor.",
+          "temp_limit_apply_discharge": "Aplica la mateixa reducció per temperatura a la potència de descàrrega. La descàrrega tolera millor la calor, així que comparteix el llindar de càrrega com a compromís; sobretot manté la descàrrega per sota del tall dur del BMS."
+        }
+      },
       "capacity_protection": {
         "title": "Mode de reducció de pics",
         "description": "Si s'activa, quan el SOC de la bateria baixi d'un llindar, el sistema conservarà energia descarregant només per cobrir consum que superi un límit pic.",
@@ -977,6 +1024,12 @@
       },
       "charge_delay": {
         "name": "Retard de Càrrega"
+      },
+      "temp_charge_limit": {
+        "name": "Límit de càrrega per temperatura"
+      },
+      "temp_charge_limit_discharge": {
+        "name": "Límit de descàrrega per temperatura"
       },
       "weekly_full_charge_delay": {
         "name": "Retardar Càrrega Setmanal Completa"
@@ -1467,6 +1520,15 @@
       },
       "delay_soc_setpoint": {
         "name": "Retard de Càrrega – SOC Setpoint"
+      },
+      "temp_charge_limit_c": {
+        "name": "Límit de càrrega per temperatura"
+      },
+      "temp_charge_limit_band_c": {
+        "name": "Banda de càrrega per temperatura"
+      },
+      "temp_charge_limit_floor_pct": {
+        "name": "Potència mínima de càrrega"
       },
       "capacity_protection_limit": {
         "name": "Reducció de Pics – Límit"

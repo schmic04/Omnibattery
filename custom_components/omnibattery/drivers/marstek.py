@@ -229,6 +229,10 @@ class MarstekModbusDriver(BatteryDriver):
         number_defs = {d.get("key"): d for d in self._definitions["number"]}
         hw_charge_ceiling = int(number_defs.get("max_charge_power", {}).get("max", max_charge_power_w))
         hw_discharge_ceiling = int(number_defs.get("max_discharge_power", {}).get("max", max_discharge_power_w))
+        # Register floor (v2/v3 = 800 W, vA/vD = 0): the minimum reliable operating
+        # power the thermal derate must not command below. 0 when absent.
+        hw_charge_floor = int(number_defs.get("max_charge_power", {}).get("min", 0))
+        hw_discharge_floor = int(number_defs.get("max_discharge_power", {}).get("min", 0))
 
         # Static capabilities, derived from the register map + the seeded entity
         # definitions so the control layer never branches on the version string.
@@ -241,6 +245,8 @@ class MarstekModbusDriver(BatteryDriver):
             push_telemetry=False,
             max_charge_power_w=hw_charge_ceiling,
             max_discharge_power_w=hw_discharge_ceiling,
+            min_charge_power_w=hw_charge_floor,
+            min_discharge_power_w=hw_discharge_floor,
             has_mppt_pv="mppt1_power" in self._telemetry_index,
             has_alarm_registers="alarm_status" in self._telemetry_index,
             has_rs485_control=REGISTER_MAP.get(version, {}).get("rs485_control") is not None,

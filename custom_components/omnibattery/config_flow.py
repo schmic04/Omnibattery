@@ -50,6 +50,16 @@ from .const import (
     CONF_ENABLE_BALANCE_MONITOR,
     CONF_ENABLE_CHARGE_DELAY,
     CONF_DELAY_SAFETY_MARGIN_MIN,
+    CONF_ENABLE_TEMP_CHARGE_LIMIT,
+    DEFAULT_ENABLE_TEMP_CHARGE_LIMIT,
+    CONF_TEMP_CHARGE_LIMIT_C,
+    DEFAULT_TEMP_CHARGE_LIMIT_C,
+    CONF_TEMP_CHARGE_LIMIT_BAND_C,
+    DEFAULT_TEMP_CHARGE_LIMIT_BAND_C,
+    CONF_TEMP_CHARGE_LIMIT_FLOOR_PCT,
+    DEFAULT_TEMP_CHARGE_LIMIT_FLOOR_PCT,
+    CONF_TEMP_LIMIT_APPLY_DISCHARGE,
+    DEFAULT_TEMP_LIMIT_APPLY_DISCHARGE,
     DEFAULT_DELAY_SAFETY_MARGIN_MIN,
     CONF_DELAY_SOC_SETPOINT_ENABLED,
     DEFAULT_DELAY_SOC_SETPOINT_ENABLED,
@@ -279,6 +289,39 @@ def _scoped_battery_config(scope: str, battery_configs: list[dict]) -> dict:
     if 0 <= idx < len(battery_configs):
         return battery_configs[idx]
     return {}
+
+
+def _temp_charge_limit_schema(existing: dict | None = None) -> dict:
+    """Voluptuous schema for the temperature charge-derate config step.
+
+    Shared by the initial config flow and the options flow; ``existing`` seeds
+    the slider defaults from the current config in the options flow.
+    """
+    existing = existing or {}
+    return {
+        vol.Optional(
+            "temp_charge_limit_c",
+            default=existing.get(CONF_TEMP_CHARGE_LIMIT_C, DEFAULT_TEMP_CHARGE_LIMIT_C),
+        ): NumberSelector(NumberSelectorConfig(
+            min=20, max=60, step=1, mode=NumberSelectorMode.SLIDER, unit_of_measurement="°C",
+        )),
+        vol.Optional(
+            "temp_charge_limit_band_c",
+            default=existing.get(CONF_TEMP_CHARGE_LIMIT_BAND_C, DEFAULT_TEMP_CHARGE_LIMIT_BAND_C),
+        ): NumberSelector(NumberSelectorConfig(
+            min=1, max=30, step=1, mode=NumberSelectorMode.SLIDER, unit_of_measurement="°C",
+        )),
+        vol.Optional(
+            "temp_charge_limit_floor_pct",
+            default=existing.get(CONF_TEMP_CHARGE_LIMIT_FLOOR_PCT, DEFAULT_TEMP_CHARGE_LIMIT_FLOOR_PCT),
+        ): NumberSelector(NumberSelectorConfig(
+            min=0, max=100, step=5, mode=NumberSelectorMode.SLIDER, unit_of_measurement="%",
+        )),
+        vol.Optional(
+            "temp_limit_apply_discharge",
+            default=existing.get(CONF_TEMP_LIMIT_APPLY_DISCHARGE, DEFAULT_TEMP_LIMIT_APPLY_DISCHARGE),
+        ): bool,
+    }
 
 
 def _slot_target_indices(scope: str, num_batteries: int) -> list[int]:
@@ -1466,7 +1509,7 @@ class MarstekVenusConfigFlow(LegacyDomainMigrationMixin, ConfigFlow, domain=DOMA
                 return await self.async_step_charge_delay_config()
             else:
                 self.config_data[CONF_ENABLE_CHARGE_DELAY] = False
-                return await self.async_step_capacity_protection()
+                return await self.async_step_temp_charge_limit()
 
         return self.async_show_form(
             step_id="charge_delay",
@@ -1508,7 +1551,7 @@ class MarstekVenusConfigFlow(LegacyDomainMigrationMixin, ConfigFlow, domain=DOMA
                         self.config_data[CONF_SOLAR_FORECAST_SENSOR] = forecast_sensor
 
             if not errors:
-                return await self.async_step_capacity_protection()
+                return await self.async_step_temp_charge_limit()
 
         has_forecast_sensor = bool(self.config_data.get(CONF_SOLAR_FORECAST_SENSOR))
         schema_dict = {
@@ -1539,6 +1582,50 @@ class MarstekVenusConfigFlow(LegacyDomainMigrationMixin, ConfigFlow, domain=DOMA
             step_id="charge_delay_config",
             data_schema=vol.Schema(schema_dict),
             errors=errors,
+        )
+
+    async def async_step_temp_charge_limit(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Ask whether to enable temperature-based charge power limiting."""
+        if user_input is not None:
+            if user_input.get("configure_temp_charge_limit", False):
+                return await self.async_step_temp_charge_limit_config()
+            self.config_data[CONF_ENABLE_TEMP_CHARGE_LIMIT] = False
+            return await self.async_step_capacity_protection()
+
+        return self.async_show_form(
+            step_id="temp_charge_limit",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("configure_temp_charge_limit", default=False): bool,
+                }
+            ),
+        )
+
+    async def async_step_temp_charge_limit_config(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Configure the temperature charge-derate thresholds."""
+        if user_input is not None:
+            self.config_data[CONF_ENABLE_TEMP_CHARGE_LIMIT] = True
+            self.config_data[CONF_TEMP_CHARGE_LIMIT_C] = int(
+                user_input.get("temp_charge_limit_c", DEFAULT_TEMP_CHARGE_LIMIT_C)
+            )
+            self.config_data[CONF_TEMP_CHARGE_LIMIT_BAND_C] = int(
+                user_input.get("temp_charge_limit_band_c", DEFAULT_TEMP_CHARGE_LIMIT_BAND_C)
+            )
+            self.config_data[CONF_TEMP_CHARGE_LIMIT_FLOOR_PCT] = int(
+                user_input.get("temp_charge_limit_floor_pct", DEFAULT_TEMP_CHARGE_LIMIT_FLOOR_PCT)
+            )
+            self.config_data[CONF_TEMP_LIMIT_APPLY_DISCHARGE] = user_input.get(
+                "temp_limit_apply_discharge", DEFAULT_TEMP_LIMIT_APPLY_DISCHARGE
+            )
+            return await self.async_step_capacity_protection()
+
+        return self.async_show_form(
+            step_id="temp_charge_limit_config",
+            data_schema=vol.Schema(_temp_charge_limit_schema()),
         )
 
     async def async_step_capacity_protection(
@@ -2160,6 +2247,7 @@ class OptionsFlowHandler(OptionsFlow):
                 "predictive_charging",
                 "weekly_full_charge",
                 "charge_delay",
+                "temp_charge_limit",
                 "capacity_protection",
                 "hourly_balance",
                 "pd_advanced",
@@ -3296,6 +3384,53 @@ class OptionsFlowHandler(OptionsFlow):
             step_id="charge_delay_config",
             data_schema=vol.Schema(schema_dict),
             errors=errors,
+        )
+
+    async def async_step_temp_charge_limit(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Ask whether to enable temperature charge limiting in options flow."""
+        if user_input is not None:
+            if user_input.get("configure_temp_charge_limit", False):
+                return await self.async_step_temp_charge_limit_config()
+            self.config_data[CONF_ENABLE_TEMP_CHARGE_LIMIT] = False
+            return await self._save_and_finish()
+
+        is_enabled = self.config_entry.data.get(
+            CONF_ENABLE_TEMP_CHARGE_LIMIT, DEFAULT_ENABLE_TEMP_CHARGE_LIMIT
+        )
+        return self.async_show_form(
+            step_id="temp_charge_limit",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("configure_temp_charge_limit", default=is_enabled): bool,
+                }
+            ),
+        )
+
+    async def async_step_temp_charge_limit_config(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Configure the temperature charge-derate thresholds in options flow."""
+        if user_input is not None:
+            self.config_data[CONF_ENABLE_TEMP_CHARGE_LIMIT] = True
+            self.config_data[CONF_TEMP_CHARGE_LIMIT_C] = int(
+                user_input.get("temp_charge_limit_c", DEFAULT_TEMP_CHARGE_LIMIT_C)
+            )
+            self.config_data[CONF_TEMP_CHARGE_LIMIT_BAND_C] = int(
+                user_input.get("temp_charge_limit_band_c", DEFAULT_TEMP_CHARGE_LIMIT_BAND_C)
+            )
+            self.config_data[CONF_TEMP_CHARGE_LIMIT_FLOOR_PCT] = int(
+                user_input.get("temp_charge_limit_floor_pct", DEFAULT_TEMP_CHARGE_LIMIT_FLOOR_PCT)
+            )
+            self.config_data[CONF_TEMP_LIMIT_APPLY_DISCHARGE] = user_input.get(
+                "temp_limit_apply_discharge", DEFAULT_TEMP_LIMIT_APPLY_DISCHARGE
+            )
+            return await self._save_and_finish()
+
+        return self.async_show_form(
+            step_id="temp_charge_limit_config",
+            data_schema=vol.Schema(_temp_charge_limit_schema(self.config_entry.data)),
         )
 
     async def async_step_capacity_protection(

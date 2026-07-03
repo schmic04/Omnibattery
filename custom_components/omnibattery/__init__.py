@@ -39,6 +39,16 @@ from .const import (
     CONF_ENABLE_CHARGE_DELAY,
     CONF_DELAY_SAFETY_MARGIN_MIN,
     DEFAULT_DELAY_SAFETY_MARGIN_MIN,
+    CONF_ENABLE_TEMP_CHARGE_LIMIT,
+    DEFAULT_ENABLE_TEMP_CHARGE_LIMIT,
+    CONF_TEMP_CHARGE_LIMIT_C,
+    DEFAULT_TEMP_CHARGE_LIMIT_C,
+    CONF_TEMP_CHARGE_LIMIT_BAND_C,
+    DEFAULT_TEMP_CHARGE_LIMIT_BAND_C,
+    CONF_TEMP_CHARGE_LIMIT_FLOOR_PCT,
+    DEFAULT_TEMP_CHARGE_LIMIT_FLOOR_PCT,
+    CONF_TEMP_LIMIT_APPLY_DISCHARGE,
+    DEFAULT_TEMP_LIMIT_APPLY_DISCHARGE,
     CONF_CHARGE_DELAY_BALANCE_DEADBAND_KWH,
     DEFAULT_CHARGE_DELAY_BALANCE_DEADBAND_KWH,
     CONF_DELAY_SOC_SETPOINT_ENABLED,
@@ -141,6 +151,7 @@ from .tracking.non_responsive_tracker import NonResponsiveTracker
 from .control.weekly_full_charge import WeeklyFullChargeManager
 from .control.active_balance_mode import ActiveBalanceModeManager
 from .control.max_soc_charge import MaxSocChargeManager
+from .control.temperature_limit import TemperatureChargeLimitManager
 from .pricing import DynamicPricingSchedule, notifications
 from .pricing.engine import PricingManager
 
@@ -449,6 +460,7 @@ class ChargeDischargeController:
         self._normal_balance_recal_latched: dict[MarstekVenusDataUpdateCoordinator, bool] = {}
         self._active_balance_mgr = ActiveBalanceModeManager(hass, self)
         self._max_soc_mgr = MaxSocChargeManager(hass, self)
+        self._temp_limit_mgr = TemperatureChargeLimitManager(hass, self)
 
         # Calculate dynamic anti-windup limits based on total system capacity
         self.max_charge_capacity = self._effective_system_capacity(coordinators, is_charging=True)
@@ -640,6 +652,12 @@ class ChargeDischargeController:
         self._charge_delay_balance_deadband_kwh = config_entry.data.get(CONF_CHARGE_DELAY_BALANCE_DEADBAND_KWH, DEFAULT_CHARGE_DELAY_BALANCE_DEADBAND_KWH)
         self._delay_soc_setpoint_enabled = config_entry.data.get(CONF_DELAY_SOC_SETPOINT_ENABLED, DEFAULT_DELAY_SOC_SETPOINT_ENABLED)
         self._delay_soc_setpoint = config_entry.data.get(CONF_DELAY_SOC_SETPOINT, DEFAULT_DELAY_SOC_SETPOINT)
+        # Temperature-based charge derate
+        self.temp_charge_limit_enabled = config_entry.data.get(CONF_ENABLE_TEMP_CHARGE_LIMIT, DEFAULT_ENABLE_TEMP_CHARGE_LIMIT)
+        self._temp_charge_limit_c = config_entry.data.get(CONF_TEMP_CHARGE_LIMIT_C, DEFAULT_TEMP_CHARGE_LIMIT_C)
+        self._temp_charge_limit_band_c = config_entry.data.get(CONF_TEMP_CHARGE_LIMIT_BAND_C, DEFAULT_TEMP_CHARGE_LIMIT_BAND_C)
+        self._temp_charge_limit_floor_pct = config_entry.data.get(CONF_TEMP_CHARGE_LIMIT_FLOOR_PCT, DEFAULT_TEMP_CHARGE_LIMIT_FLOOR_PCT)
+        self.temp_limit_apply_discharge = config_entry.data.get(CONF_TEMP_LIMIT_APPLY_DISCHARGE, DEFAULT_TEMP_LIMIT_APPLY_DISCHARGE)
         self._weekly_full_charge_skip_delay = config_entry.data.get(
             CONF_WEEKLY_FULL_CHARGE_SKIP_DELAY, DEFAULT_WEEKLY_FULL_CHARGE_SKIP_DELAY
         )
@@ -991,14 +1009,16 @@ class ChargeDischargeController:
     def _battery_power_limit(self, coordinator, is_charging: bool) -> int:
         """Return the effective per-battery power limit for the current cycle."""
         if not is_charging:
-            return self._apply_slot_power_ceiling(
-                coordinator, False, coordinator.max_discharge_power
+            limit = self._temp_limit_mgr.apply_discharge_limit(
+                coordinator, coordinator.max_discharge_power
             )
+            return self._apply_slot_power_ceiling(coordinator, False, limit)
 
         limit = coordinator.max_charge_power
         if coordinator.data is None:
             return self._apply_slot_power_ceiling(coordinator, True, limit)
         limit = self._max_soc_mgr.apply_charge_taper(coordinator, limit)
+        limit = self._temp_limit_mgr.apply_temperature_limit(coordinator, limit)
         return self._apply_slot_power_ceiling(coordinator, True, limit)
 
     def _apply_no_pd_overrides(self):
@@ -1076,6 +1096,12 @@ class ChargeDischargeController:
         self._charge_delay_balance_deadband_kwh = new_balance_deadband
         self._delay_soc_setpoint_enabled = self.config_entry.data.get(CONF_DELAY_SOC_SETPOINT_ENABLED, DEFAULT_DELAY_SOC_SETPOINT_ENABLED)
         self._delay_soc_setpoint = self.config_entry.data.get(CONF_DELAY_SOC_SETPOINT, DEFAULT_DELAY_SOC_SETPOINT)
+        # Temperature-based charge derate
+        self.temp_charge_limit_enabled = self.config_entry.data.get(CONF_ENABLE_TEMP_CHARGE_LIMIT, DEFAULT_ENABLE_TEMP_CHARGE_LIMIT)
+        self._temp_charge_limit_c = self.config_entry.data.get(CONF_TEMP_CHARGE_LIMIT_C, DEFAULT_TEMP_CHARGE_LIMIT_C)
+        self._temp_charge_limit_band_c = self.config_entry.data.get(CONF_TEMP_CHARGE_LIMIT_BAND_C, DEFAULT_TEMP_CHARGE_LIMIT_BAND_C)
+        self._temp_charge_limit_floor_pct = self.config_entry.data.get(CONF_TEMP_CHARGE_LIMIT_FLOOR_PCT, DEFAULT_TEMP_CHARGE_LIMIT_FLOOR_PCT)
+        self.temp_limit_apply_discharge = self.config_entry.data.get(CONF_TEMP_LIMIT_APPLY_DISCHARGE, DEFAULT_TEMP_LIMIT_APPLY_DISCHARGE)
         self._weekly_full_charge_skip_delay = self.config_entry.data.get(
             CONF_WEEKLY_FULL_CHARGE_SKIP_DELAY, DEFAULT_WEEKLY_FULL_CHARGE_SKIP_DELAY
         )

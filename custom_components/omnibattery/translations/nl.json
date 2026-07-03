@@ -333,6 +333,29 @@
           "solar_forecast_sensor": "Sensor die de zonneproductievoorspelling in kWh levert (bijv. Solcast). Niet vereist als u deze sensor al in de eerste stap heeft geconfigureerd — hij wordt automatisch gebruikt."
         }
       },
+      "temp_charge_limit": {
+        "title": "Temperatuurbegrenzing laden",
+        "description": "Laadvermogen verlagen als een batterij te warm wordt? Boven een temperatuurlimiet wordt het laden geleidelijk teruggeregeld en weer hersteld als de batterij afkoelt.",
+        "data": {
+          "configure_temp_charge_limit": "Temperatuurbegrenzing laden instellen"
+        }
+      },
+      "temp_charge_limit_config": {
+        "title": "Instellingen temperatuurbegrenzing laden",
+        "description": "Stel de temperatuur in waarbij het laden gaat terugregelen, de band waarover dit afbouwt, en het minimale laadvermogen (als percentage van normaal).",
+        "data": {
+          "temp_charge_limit_c": "Temperatuurlimiet (°C)",
+          "temp_charge_limit_band_c": "Afbouwband (°C)",
+          "temp_charge_limit_floor_pct": "Minimaal laadvermogen (%)",
+          "temp_limit_apply_discharge": "Ook ontladen terugregelen"
+        },
+        "data_description": {
+          "temp_charge_limit_c": "Onder of op deze temperatuur laadt de batterij op vol vermogen; daarboven begint het terugregelen.",
+          "temp_charge_limit_band_c": "Temperatuurbereik boven de limiet waarover het laadvermogen afbouwt naar het minimum.",
+          "temp_charge_limit_floor_pct": "Laadvermogen bij limiet plus band, als percentage van het normale laadmaximum. 0% stopt het laden volledig als het zeer warm is.",
+          "temp_limit_apply_discharge": "Pas dezelfde temperatuurterugregeling toe op het ontlaadvermogen. Ontladen verdraagt warmte beter, dus dit deelt de laaddrempel als compromis; vooral houdt het het ontladen onder de harde BMS-uitschakeling."
+        }
+      },
       "capacity_protection": {
         "title": "Piekbegrenzing",
         "description": "Indien ingeschakeld, als de batterij-SOC onder een drempel daalt, spaart het systeem energie door alleen te ontladen om verbruik boven een pieklimiet te compenseren.",
@@ -489,6 +512,7 @@
           "predictive_charging": "Voorspellend laden",
           "weekly_full_charge": "Wekelijkse volledige lading",
           "charge_delay": "Zonne-oplaadvertraging",
+          "temp_charge_limit": "Temperatuurbegrenzing laden",
           "capacity_protection": "Capaciteitsbescherming",
           "pd_advanced": "PD-regelaar (geavanceerd)",
           "hourly_balance": "Uurlijks netsaldo"
@@ -822,6 +846,29 @@
           "solar_forecast_sensor": "Sensor die de zonneproductievoorspelling in kWh levert (bijv. Solcast). Niet vereist als u deze sensor al in de eerste stap heeft geconfigureerd — hij wordt automatisch gebruikt."
         }
       },
+      "temp_charge_limit": {
+        "title": "Temperatuurbegrenzing laden",
+        "description": "Laadvermogen verlagen als een batterij te warm wordt? Boven een temperatuurlimiet wordt het laden geleidelijk teruggeregeld en weer hersteld als de batterij afkoelt.",
+        "data": {
+          "configure_temp_charge_limit": "Temperatuurbegrenzing laden instellen"
+        }
+      },
+      "temp_charge_limit_config": {
+        "title": "Instellingen temperatuurbegrenzing laden",
+        "description": "Stel de temperatuur in waarbij het laden gaat terugregelen, de band waarover dit afbouwt, en het minimale laadvermogen (als percentage van normaal).",
+        "data": {
+          "temp_charge_limit_c": "Temperatuurlimiet (°C)",
+          "temp_charge_limit_band_c": "Afbouwband (°C)",
+          "temp_charge_limit_floor_pct": "Minimaal laadvermogen (%)",
+          "temp_limit_apply_discharge": "Ook ontladen terugregelen"
+        },
+        "data_description": {
+          "temp_charge_limit_c": "Onder of op deze temperatuur laadt de batterij op vol vermogen; daarboven begint het terugregelen.",
+          "temp_charge_limit_band_c": "Temperatuurbereik boven de limiet waarover het laadvermogen afbouwt naar het minimum.",
+          "temp_charge_limit_floor_pct": "Laadvermogen bij limiet plus band, als percentage van het normale laadmaximum. 0% stopt het laden volledig als het zeer warm is.",
+          "temp_limit_apply_discharge": "Pas dezelfde temperatuurterugregeling toe op het ontlaadvermogen. Ontladen verdraagt warmte beter, dus dit deelt de laaddrempel als compromis; vooral houdt het het ontladen onder de harde BMS-uitschakeling."
+        }
+      },
       "capacity_protection": {
         "title": "Piekbegrenzing",
         "description": "Indien ingeschakeld, als de batterij-SOC onder een drempel daalt, spaart het systeem energie door alleen te ontladen om verbruik boven een pieklimiet te compenseren.",
@@ -977,6 +1024,12 @@
       },
       "charge_delay": {
         "name": "Laadvertraging"
+      },
+      "temp_charge_limit": {
+        "name": "Temperatuurbegrenzing laden"
+      },
+      "temp_charge_limit_discharge": {
+        "name": "Temperatuurbegrenzing ontladen"
       },
       "weekly_full_charge_delay": {
         "name": "Wekelijkse Volledige Lading Vertragen"
@@ -1467,6 +1520,15 @@
       },
       "delay_soc_setpoint": {
         "name": "Laadvertraging – SOC-drempel"
+      },
+      "temp_charge_limit_c": {
+        "name": "Temperatuurlimiet laden"
+      },
+      "temp_charge_limit_band_c": {
+        "name": "Temperatuurband laden"
+      },
+      "temp_charge_limit_floor_pct": {
+        "name": "Minimaal laadvermogen"
       },
       "capacity_protection_limit": {
         "name": "Piekbegrenzing Limiet"

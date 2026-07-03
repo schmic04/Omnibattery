@@ -18,6 +18,13 @@ from .const import (
     CONF_SYSTEM_MAX_DISCHARGE_POWER,
     CONF_MAX_PRICE_THRESHOLD,
     CONF_DISCHARGE_PRICE_THRESHOLD,
+    CONF_ENABLE_TEMP_CHARGE_LIMIT,
+    CONF_TEMP_CHARGE_LIMIT_C,
+    DEFAULT_TEMP_CHARGE_LIMIT_C,
+    CONF_TEMP_CHARGE_LIMIT_BAND_C,
+    DEFAULT_TEMP_CHARGE_LIMIT_BAND_C,
+    CONF_TEMP_CHARGE_LIMIT_FLOOR_PCT,
+    DEFAULT_TEMP_CHARGE_LIMIT_FLOOR_PCT,
     CONF_PREDICTIVE_CHARGING_MODE,
     CONF_PRICE_INTEGRATION_TYPE,
     PREDICTIVE_MODE_DYNAMIC_PRICING,
@@ -99,6 +106,11 @@ async def async_setup_entry(
     ):
         entities.append(MarstekPriceThresholdNumber(hass, entry, "charge"))
         entities.append(MarstekPriceThresholdNumber(hass, entry, "discharge"))
+
+    # Temperature charge limit sliders (system-level, when the feature is configured)
+    if CONF_ENABLE_TEMP_CHARGE_LIMIT in entry.data:
+        for kind in ("limit", "band", "floor"):
+            entities.append(TempChargeLimitNumber(hass, entry, kind))
 
     # Per-excluded-device "exclusion %" sliders (runtime adjustable). EV
     # no-telemetry devices have no numeric power sensor, so the slider would do
@@ -337,6 +349,77 @@ class MarstekPriceThresholdNumber(NumberEntity):
         new_data[self._conf_key] = value
         self.hass.config_entries.async_update_entry(self.entry, data=new_data)
         _LOGGER.info("Dynamic pricing %s price threshold updated to %s", self._kind, value)
+        self.async_write_ha_state()
+
+    @property
+    def device_info(self):
+        """Return device information for the system."""
+        return {
+            "identifiers": {(DOMAIN, "marstek_venus_system")},
+            "name": "Omnibattery System",
+            "manufacturer": "Omnibattery",
+            "model": "Multi-Battery System",
+        }
+
+
+class TempChargeLimitNumber(NumberEntity):
+    """Live-editable temperature charge-derate parameter (limit / band / floor).
+
+    Mirrors the value into ``config_entry.data``; the controller re-reads all
+    three on every entry update (``update_pd_parameters``), so a change takes
+    effect on the next control cycle.
+    """
+
+    _attr_has_entity_name = True
+    _attr_mode = NumberMode.SLIDER
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_should_poll = False
+
+    # kind -> (translation_key/entity slug, conf_key, default, unit, min, max, step, icon)
+    _SPEC = {
+        "limit": ("temp_charge_limit_c", CONF_TEMP_CHARGE_LIMIT_C, DEFAULT_TEMP_CHARGE_LIMIT_C,
+                  "°C", 20, 60, 1, "mdi:thermometer-high"),
+        "band": ("temp_charge_limit_band_c", CONF_TEMP_CHARGE_LIMIT_BAND_C, DEFAULT_TEMP_CHARGE_LIMIT_BAND_C,
+                 "°C", 1, 30, 1, "mdi:thermometer-lines"),
+        "floor": ("temp_charge_limit_floor_pct", CONF_TEMP_CHARGE_LIMIT_FLOOR_PCT, DEFAULT_TEMP_CHARGE_LIMIT_FLOOR_PCT,
+                  "%", 0, 100, 5, "mdi:battery-charging-low"),
+    }
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, kind: str) -> None:
+        """kind = 'limit' (°C), 'band' (°C) or 'floor' (% of normal charge power)."""
+        self.hass = hass
+        self.entry = entry
+        self._kind = kind
+        key, conf_key, default, unit, lo, hi, step, icon = self._SPEC[kind]
+        self._conf_key = conf_key
+        self._default = default
+        self._attr_translation_key = key
+        self._attr_unique_id = f"{SYSTEM_UNIQUE_ID_PREFIX}{key}"
+        self.entity_id = system_entity_id("number", key)
+        self._attr_native_unit_of_measurement = unit
+        self._attr_native_min_value = lo
+        self._attr_native_max_value = hi
+        self._attr_native_step = step
+        self._attr_icon = icon
+
+    async def async_added_to_hass(self) -> None:
+        """Refresh state when config_entry.data changes (options flow / sibling write)."""
+        self.async_on_remove(self.entry.add_update_listener(self._handle_entry_update))
+
+    async def _handle_entry_update(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+        self.async_write_ha_state()
+
+    @property
+    def native_value(self) -> float:
+        """Current value from config_entry.data (default when unset)."""
+        return self.entry.data.get(self._conf_key, self._default)
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Persist the new value to config_entry.data."""
+        new_data = dict(self.entry.data)
+        new_data[self._conf_key] = int(value)
+        self.hass.config_entries.async_update_entry(self.entry, data=new_data)
+        _LOGGER.info("Temperature charge limit %s updated to %s", self._kind, int(value))
         self.async_write_ha_state()
 
     @property

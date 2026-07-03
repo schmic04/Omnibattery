@@ -333,6 +333,29 @@
           "solar_forecast_sensor": "Sensor que proporciona la predicción de producción solar en kWh (ej: Solcast). No es necesario si ya configuraste este sensor en el paso inicial: se usará automáticamente."
         }
       },
+      "temp_charge_limit": {
+        "title": "Límite de carga por temperatura",
+        "description": "¿Reducir la potencia de carga cuando una batería se calienta? Por encima de un límite de temperatura la carga se reduce progresivamente y se restablece cuando la batería se enfría.",
+        "data": {
+          "configure_temp_charge_limit": "Configurar límite de carga por temperatura"
+        }
+      },
+      "temp_charge_limit_config": {
+        "title": "Configuración del límite de carga por temperatura",
+        "description": "Define la temperatura a la que la carga empieza a reducirse, la banda en la que disminuye y la potencia de carga mínima (como porcentaje de la normal).",
+        "data": {
+          "temp_charge_limit_c": "Límite de temperatura (°C)",
+          "temp_charge_limit_band_c": "Banda de reducción (°C)",
+          "temp_charge_limit_floor_pct": "Potencia de carga mínima (%)",
+          "temp_limit_apply_discharge": "Reducir también la descarga"
+        },
+        "data_description": {
+          "temp_charge_limit_c": "La carga funciona a plena potencia a esta temperatura o por debajo; por encima comienza la reducción.",
+          "temp_charge_limit_band_c": "Rango de temperatura por encima del límite en el que la potencia de carga baja hasta el mínimo.",
+          "temp_charge_limit_floor_pct": "Potencia de carga en el límite más la banda, como porcentaje del máximo de carga normal. 0% detiene la carga por completo cuando hace mucho calor.",
+          "temp_limit_apply_discharge": "Aplica la misma reducción por temperatura a la potencia de descarga. La descarga tolera mejor el calor, por lo que comparte el umbral de carga como compromiso; sobre todo mantiene la descarga por debajo del corte duro del BMS."
+        }
+      },
       "capacity_protection": {
         "title": "Modo de reducción de picos",
         "description": "Si se activa, cuando el SOC de la batería baje de un umbral, el sistema conservará energía descargando solo para cubrir consumo que supere un límite pico.",
@@ -489,6 +512,7 @@
           "predictive_charging": "Carga predictiva",
           "weekly_full_charge": "Carga completa semanal",
           "charge_delay": "Retraso de carga solar",
+          "temp_charge_limit": "Límite de carga por temperatura",
           "capacity_protection": "Protección de capacidad",
           "hourly_balance": "Balance neto horario",
           "pd_advanced": "Controlador PD (avanzado)"
@@ -822,6 +846,29 @@
           "solar_forecast_sensor": "Sensor que proporciona la predicción de producción solar en kWh (ej: Solcast). No es necesario si ya configuraste este sensor en el paso inicial: se usará automáticamente."
         }
       },
+      "temp_charge_limit": {
+        "title": "Límite de carga por temperatura",
+        "description": "¿Reducir la potencia de carga cuando una batería se calienta? Por encima de un límite de temperatura la carga se reduce progresivamente y se restablece cuando la batería se enfría.",
+        "data": {
+          "configure_temp_charge_limit": "Configurar límite de carga por temperatura"
+        }
+      },
+      "temp_charge_limit_config": {
+        "title": "Configuración del límite de carga por temperatura",
+        "description": "Define la temperatura a la que la carga empieza a reducirse, la banda en la que disminuye y la potencia de carga mínima (como porcentaje de la normal).",
+        "data": {
+          "temp_charge_limit_c": "Límite de temperatura (°C)",
+          "temp_charge_limit_band_c": "Banda de reducción (°C)",
+          "temp_charge_limit_floor_pct": "Potencia de carga mínima (%)",
+          "temp_limit_apply_discharge": "Reducir también la descarga"
+        },
+        "data_description": {
+          "temp_charge_limit_c": "La carga funciona a plena potencia a esta temperatura o por debajo; por encima comienza la reducción.",
+          "temp_charge_limit_band_c": "Rango de temperatura por encima del límite en el que la potencia de carga baja hasta el mínimo.",
+          "temp_charge_limit_floor_pct": "Potencia de carga en el límite más la banda, como porcentaje del máximo de carga normal. 0% detiene la carga por completo cuando hace mucho calor.",
+          "temp_limit_apply_discharge": "Aplica la misma reducción por temperatura a la potencia de descarga. La descarga tolera mejor el calor, por lo que comparte el umbral de carga como compromiso; sobre todo mantiene la descarga por debajo del corte duro del BMS."
+        }
+      },
       "capacity_protection": {
         "title": "Modo de reducción de picos",
         "description": "Si se activa, cuando el SOC de la batería baje de un umbral, el sistema conservará energía descargando solo para cubrir consumo que supere un límite pico.",
@@ -980,6 +1027,12 @@
       },
       "charge_delay": {
         "name": "Retraso de Carga"
+      },
+      "temp_charge_limit": {
+        "name": "Límite de carga por temperatura"
+      },
+      "temp_charge_limit_discharge": {
+        "name": "Límite de descarga por temperatura"
       },
       "weekly_full_charge_delay": {
         "name": "Retrasar Carga Semanal Completa"
@@ -1467,6 +1520,15 @@
       },
       "delay_soc_setpoint": {
         "name": "Retraso de Carga – SOC Setpoint"
+      },
+      "temp_charge_limit_c": {
+        "name": "Límite de carga por temperatura"
+      },
+      "temp_charge_limit_band_c": {
+        "name": "Banda de carga por temperatura"
+      },
+      "temp_charge_limit_floor_pct": {
+        "name": "Potencia mínima de carga"
       },
       "capacity_protection_limit": {
         "name": "Reducción de Picos – Límite"

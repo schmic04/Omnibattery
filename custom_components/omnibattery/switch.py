@@ -17,6 +17,8 @@ from .const import (
     CONF_ACTIVE_BALANCE_MODE_ENABLED,
     CONF_CAPACITY_PROTECTION_ENABLED,
     CONF_ENABLE_CHARGE_DELAY,
+    CONF_ENABLE_TEMP_CHARGE_LIMIT,
+    CONF_TEMP_LIMIT_APPLY_DISCHARGE,
     CONF_ENABLE_HOURLY_BALANCE,
     CONF_ENABLE_SYSTEM_POWER_LIMITS,
     CONF_ENABLE_WEEKLY_FULL_CHARGE_DELAY,
@@ -84,6 +86,11 @@ async def async_setup_entry(
     # both weekly full charge and the charge delay are configured.
     if controller and controller.weekly_full_charge_enabled and has_charge_delay_config:
         entities.append(WeeklyFullChargeDelaySwitch(hass, entry, controller))
+
+    # Add temperature charge limit switch (system-level, when configured)
+    if controller and CONF_ENABLE_TEMP_CHARGE_LIMIT in entry.data:
+        entities.append(TempChargeLimitSwitch(hass, entry, controller))
+        entities.append(TempChargeLimitDischargeSwitch(hass, entry, controller))
 
     # Add hourly balance switch (system-level, when hourly balance is configured)
     if controller and CONF_ENABLE_HOURLY_BALANCE in entry.data:
@@ -628,6 +635,106 @@ class ChargeDelaySwitch(SwitchEntity):
         new_data[CONF_ENABLE_CHARGE_DELAY] = False
         self.hass.config_entries.async_update_entry(self.entry, data=new_data)
         _LOGGER.info("Charge Delay DISABLED")
+        self.async_write_ha_state()
+
+    @property
+    def device_info(self):
+        """Return device information for the system."""
+        return {
+            "identifiers": {(DOMAIN, "marstek_venus_system")},
+            "name": "Omnibattery System",
+            "manufacturer": "Omnibattery",
+            "model": "Multi-Battery System",
+        }
+
+
+class TempChargeLimitSwitch(SwitchEntity):
+    """Switch to enable/disable temperature-based charge power limiting."""
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, controller) -> None:
+        """Initialize the temperature charge limit switch."""
+        self.hass = hass
+        self.entry = entry
+        self.controller = controller
+
+        self._attr_has_entity_name = True
+        self._attr_translation_key = "temp_charge_limit"
+        self._attr_unique_id = f"{SYSTEM_UNIQUE_ID_PREFIX}temp_charge_limit"
+        self.entity_id = system_entity_id("switch", "temp_charge_limit")
+        self._attr_icon = "mdi:thermometer-alert"
+        self._attr_should_poll = False
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if temperature charge limiting is enabled."""
+        return self.controller.temp_charge_limit_enabled
+
+    async def async_turn_on(self, **kwargs) -> None:
+        """Enable temperature charge limiting."""
+        self.controller.temp_charge_limit_enabled = True
+        new_data = dict(self.entry.data)
+        new_data[CONF_ENABLE_TEMP_CHARGE_LIMIT] = True
+        self.hass.config_entries.async_update_entry(self.entry, data=new_data)
+        _LOGGER.info("Temperature Charge Limit ENABLED")
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs) -> None:
+        """Disable temperature charge limiting."""
+        self.controller.temp_charge_limit_enabled = False
+        new_data = dict(self.entry.data)
+        new_data[CONF_ENABLE_TEMP_CHARGE_LIMIT] = False
+        self.hass.config_entries.async_update_entry(self.entry, data=new_data)
+        _LOGGER.info("Temperature Charge Limit DISABLED")
+        self.async_write_ha_state()
+
+    @property
+    def device_info(self):
+        """Return device information for the system."""
+        return {
+            "identifiers": {(DOMAIN, "marstek_venus_system")},
+            "name": "Omnibattery System",
+            "manufacturer": "Omnibattery",
+            "model": "Multi-Battery System",
+        }
+
+
+class TempChargeLimitDischargeSwitch(SwitchEntity):
+    """Sub-toggle: also apply the thermal derate to discharge power."""
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, controller) -> None:
+        """Initialize the discharge sub-toggle."""
+        self.hass = hass
+        self.entry = entry
+        self.controller = controller
+
+        self._attr_has_entity_name = True
+        self._attr_translation_key = "temp_charge_limit_discharge"
+        self._attr_unique_id = f"{SYSTEM_UNIQUE_ID_PREFIX}temp_charge_limit_discharge"
+        self.entity_id = system_entity_id("switch", "temp_charge_limit_discharge")
+        self._attr_icon = "mdi:battery-arrow-down"
+        self._attr_should_poll = False
+
+    @property
+    def is_on(self) -> bool:
+        """Return True if the derate also applies to discharge."""
+        return self.controller.temp_limit_apply_discharge
+
+    async def async_turn_on(self, **kwargs) -> None:
+        """Apply the derate to discharge as well."""
+        self.controller.temp_limit_apply_discharge = True
+        new_data = dict(self.entry.data)
+        new_data[CONF_TEMP_LIMIT_APPLY_DISCHARGE] = True
+        self.hass.config_entries.async_update_entry(self.entry, data=new_data)
+        _LOGGER.info("Temperature Charge Limit: discharge derate ENABLED")
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs) -> None:
+        """Limit the derate to charge only."""
+        self.controller.temp_limit_apply_discharge = False
+        new_data = dict(self.entry.data)
+        new_data[CONF_TEMP_LIMIT_APPLY_DISCHARGE] = False
+        self.hass.config_entries.async_update_entry(self.entry, data=new_data)
+        _LOGGER.info("Temperature Charge Limit: discharge derate DISABLED")
         self.async_write_ha_state()
 
     @property

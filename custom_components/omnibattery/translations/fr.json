@@ -333,6 +333,29 @@
           "solar_forecast_sensor": "Capteur fournissant la prévision de production solaire en kWh (ex : Solcast). Non requis si ce capteur a déjà été configuré à l'étape initiale — il sera utilisé automatiquement."
         }
       },
+      "temp_charge_limit": {
+        "title": "Limite de charge par température",
+        "description": "Réduire la puissance de charge quand une batterie chauffe ? Au-dessus d'une limite de température, la charge est réduite progressivement puis rétablie au refroidissement.",
+        "data": {
+          "configure_temp_charge_limit": "Configurer la limite de charge par température"
+        }
+      },
+      "temp_charge_limit_config": {
+        "title": "Configuration de la limite de charge par température",
+        "description": "Définissez la température à laquelle la charge commence à être réduite, la plage sur laquelle elle diminue et la puissance de charge minimale (en pourcentage de la normale).",
+        "data": {
+          "temp_charge_limit_c": "Limite de température (°C)",
+          "temp_charge_limit_band_c": "Plage de réduction (°C)",
+          "temp_charge_limit_floor_pct": "Puissance de charge minimale (%)",
+          "temp_limit_apply_discharge": "Réduire aussi la décharge"
+        },
+        "data_description": {
+          "temp_charge_limit_c": "La charge fonctionne à pleine puissance à cette température ou en dessous ; au-dessus, la réduction commence.",
+          "temp_charge_limit_band_c": "Plage de température au-dessus de la limite sur laquelle la puissance de charge descend jusqu'au minimum.",
+          "temp_charge_limit_floor_pct": "Puissance de charge à la limite plus la plage, en pourcentage du plafond de charge normal. 0 % arrête complètement la charge en cas de forte chaleur.",
+          "temp_limit_apply_discharge": "Applique la même réduction par température à la puissance de décharge. La décharge tolère mieux la chaleur, elle partage donc le seuil de charge en compromis ; surtout, elle maintient la décharge sous la coupure dure du BMS."
+        }
+      },
       "capacity_protection": {
         "title": "Mode écrêtement de pointe",
         "description": "Si activé, lorsque le SOC de la batterie descend en dessous d'un seuil, le système économise l'énergie en ne déchargeant que pour compenser la consommation dépassant une limite de pointe.",
@@ -489,6 +512,7 @@
           "predictive_charging": "Charge prédictive",
           "weekly_full_charge": "Charge complète hebdomadaire",
           "charge_delay": "Retard de charge solaire",
+          "temp_charge_limit": "Limite de charge par température",
           "capacity_protection": "Protection de capacité",
           "pd_advanced": "Contrôleur PD (avancé)",
           "hourly_balance": "Bilan horaire net"
@@ -822,6 +846,29 @@
           "solar_forecast_sensor": "Capteur fournissant la prévision de production solaire en kWh (ex : Solcast). Non requis si ce capteur a déjà été configuré à l'étape initiale — il sera utilisé automatiquement."
         }
       },
+      "temp_charge_limit": {
+        "title": "Limite de charge par température",
+        "description": "Réduire la puissance de charge quand une batterie chauffe ? Au-dessus d'une limite de température, la charge est réduite progressivement puis rétablie au refroidissement.",
+        "data": {
+          "configure_temp_charge_limit": "Configurer la limite de charge par température"
+        }
+      },
+      "temp_charge_limit_config": {
+        "title": "Configuration de la limite de charge par température",
+        "description": "Définissez la température à laquelle la charge commence à être réduite, la plage sur laquelle elle diminue et la puissance de charge minimale (en pourcentage de la normale).",
+        "data": {
+          "temp_charge_limit_c": "Limite de température (°C)",
+          "temp_charge_limit_band_c": "Plage de réduction (°C)",
+          "temp_charge_limit_floor_pct": "Puissance de charge minimale (%)",
+          "temp_limit_apply_discharge": "Réduire aussi la décharge"
+        },
+        "data_description": {
+          "temp_charge_limit_c": "La charge fonctionne à pleine puissance à cette température ou en dessous ; au-dessus, la réduction commence.",
+          "temp_charge_limit_band_c": "Plage de température au-dessus de la limite sur laquelle la puissance de charge descend jusqu'au minimum.",
+          "temp_charge_limit_floor_pct": "Puissance de charge à la limite plus la plage, en pourcentage du plafond de charge normal. 0 % arrête complètement la charge en cas de forte chaleur.",
+          "temp_limit_apply_discharge": "Applique la même réduction par température à la puissance de décharge. La décharge tolère mieux la chaleur, elle partage donc le seuil de charge en compromis ; surtout, elle maintient la décharge sous la coupure dure du BMS."
+        }
+      },
       "capacity_protection": {
         "title": "Mode écrêtement de pointe",
         "description": "Si activé, lorsque le SOC de la batterie descend en dessous d'un seuil, le système économise l'énergie en ne déchargeant que pour compenser la consommation dépassant une limite de pointe.",
@@ -977,6 +1024,12 @@
       },
       "charge_delay": {
         "name": "Délai de Charge"
+      },
+      "temp_charge_limit": {
+        "name": "Limite de charge par température"
+      },
+      "temp_charge_limit_discharge": {
+        "name": "Limite de décharge par température"
       },
       "weekly_full_charge_delay": {
         "name": "Retarder la Charge Complète Hebdomadaire"
@@ -1467,6 +1520,15 @@
       },
       "delay_soc_setpoint": {
         "name": "Retard de Charge – SOC Seuil"
+      },
+      "temp_charge_limit_c": {
+        "name": "Limite de charge par température"
+      },
+      "temp_charge_limit_band_c": {
+        "name": "Plage de charge par température"
+      },
+      "temp_charge_limit_floor_pct": {
+        "name": "Puissance de charge minimale"
       },
       "capacity_protection_limit": {
         "name": "Écrêtement de Pointe – Limite"

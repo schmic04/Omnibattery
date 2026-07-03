@@ -309,6 +309,24 @@ CONF_DELAY_SOC_SETPOINT = "delay_soc_setpoint"
 DEFAULT_DELAY_SOC_SETPOINT = 50  # % — default when the setpoint is enabled
 DELAY_SOC_SETPOINT_HYSTERESIS = 3  # % — SOC must drop this far below setpoint before recharging
 
+# Temperature-based charge power derate. When a battery runs hot, charge power is
+# proportionally reduced: full power at/below the limit, ramping linearly down to
+# a floor (% of the normal charge ceiling) as temperature rises across the band,
+# and back up as it cools. Charge-only; per-battery on internal_temperature.
+CONF_ENABLE_TEMP_CHARGE_LIMIT = "enable_temp_charge_limit"
+DEFAULT_ENABLE_TEMP_CHARGE_LIMIT = False
+CONF_TEMP_CHARGE_LIMIT_C = "temp_charge_limit_c"
+DEFAULT_TEMP_CHARGE_LIMIT_C = 40  # °C, derate starts at/above this temperature
+CONF_TEMP_CHARGE_LIMIT_BAND_C = "temp_charge_limit_band_c"
+DEFAULT_TEMP_CHARGE_LIMIT_BAND_C = 10  # °C, width over which power ramps to the floor
+CONF_TEMP_CHARGE_LIMIT_FLOOR_PCT = "temp_charge_limit_floor_pct"
+DEFAULT_TEMP_CHARGE_LIMIT_FLOOR_PCT = 40  # % of normal charge power at limit+band (0 = full stop)
+# Optionally apply the SAME derate curve to discharge. Discharge tolerates heat
+# better than charge, so this shares one (charge-tuned) threshold as a deliberate
+# compromise; its main benefit is staying under the BMS hard over-temp cutoff.
+CONF_TEMP_LIMIT_APPLY_DISCHARGE = "temp_limit_apply_discharge"
+DEFAULT_TEMP_LIMIT_APPLY_DISCHARGE = False
+
 # Hourly Net Balance
 CONF_ENABLE_HOURLY_BALANCE = "enable_hourly_balance"
 CONF_HOURLY_BALANCE_TARGET_NET_WH = "hourly_balance_target_net_wh"

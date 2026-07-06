@@ -38,6 +38,23 @@ See [Solar charge delay](../features/solar-charge-delay.md) for how it works.
 
 ---
 
+## Temperature charge limit
+
+Reduces charge/discharge power when the battery gets hot. Above a temperature limit charging/discharging is throttled proportionally and restored as the battery cools down.
+
+Linear derate from full charge power down to a floor as a battery's temperature crosses a configurable limit and band; floor is clamped to each battery's minimum operating power (v2/v3 = 800 W, vA/vD/Zendure = 0). Optional discharge derate too, to stay under the BMS over-temp cutoff. Controls in all six languages. Thanks to @syphernl for the contribution.
+
+| Field | Description | Default |
+|---|---|---|
+| **Temperature limit (°C)** | Charging runs at full power at or below this temperature; above the derate begins | `40°C` |
+| **Ramp band (°C)** | Temperature range above the limit over which charge power ramps down to the minimum | `10°C` |
+| **Minimum charge power (%)** | Charge power at the limit plus the band, as a percentage of the normal charge ceiling. 0% stops charging when very hot | `40%` |
+| **Also throttle discharge** | Apply the same temperature derate to discharge power. Keeps discharge under the BMS over-temp cutoff. | `off`|
+
+![Temperature charge limit configuration](../assets/screenshots/configuration/advanced-temperature-charge-limit-config.png){ width="650"  style="display: block; margin: 0 auto;"}
+
+---
+
 ## Capacity protection (peak shaving)
 
 Limits discharge when SOC drops below a threshold, covering only consumption peaks that exceed a configurable power limit.

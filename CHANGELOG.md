@@ -3,6 +3,7 @@
 ## [1.0.0b7] - 2026-07-12
 
 ### Added
+- **Re-evaluate prices button on the dashboard**: the dynamic-pricing re-evaluation button now renders in the Predictive Charging card (only with dynamic pricing enabled). Also fixes never-pressed buttons being hidden by the `unknown`-state filter. [`frontend/marstek-panel.js`](custom_components/omnibattery/frontend/marstek-panel.js).
 - **Dashboard help for temperature-limit and SOC-floor rows**: tooltips/popovers added for the four temperature charge-limit params, the temperature discharge-limit switch and the guaranteed-minimum-SOC switch (all six languages). [`frontend/marstek-panel.js`](custom_components/omnibattery/frontend/marstek-panel.js).
 - **Hideable control cards**: in the Control tab's arrange mode, each card gets an eye toggle that parks it in a "Hidden cards" section below the grid; restore it from there. Persists per browser. [`frontend/marstek-panel.js`](custom_components/omnibattery/frontend/marstek-panel.js).
 - **Feedforward on confirmed load steps (PD mode)**: a kettle/oven-sized load step is now covered in one deadbeat cycle (~5-7 s, actuator floor) instead of the ~13 s exponential approach of the incremental P term. Two-sample confirmation rejects meter spikes; a cooldown and an opposite-sign pulse guard keep pulsing loads (induction hobs) on the stable slow-PD averaging. [`__init__.py`](custom_components/omnibattery/__init__.py).

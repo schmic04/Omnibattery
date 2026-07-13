@@ -88,7 +88,7 @@ const I18N = {
     secTempLimit: "Temperature charge limit", itemTempLimitC: "Temperature limit", itemTempLimitBand: "Ramp band", itemTempLimitFloor: "Minimum charge power", itemTempApplyDischarge: "Also throttle discharge",
     itemMaxContracted: "Max contracted power", itemSolarSafety: "Solar safety margin", itemGridChargeMargin: "Grid charge margin", itemMinSocFloorEnable: "SOC floor", itemMinSocFloor: "Guaranteed minimum SOC",
     itemSocThreshold: "SOC threshold", itemPeakLimit: "Peak limit",
-    itemMaxPrice: "Max price (charge)", itemDischargePrice: "Discharge price floor", itemPriceDischarge: "Discharge only above price",
+    itemMaxPrice: "Max price (charge)", itemDischargePrice: "Discharge price floor", itemPriceDischarge: "Discharge only above price", itemReevaluatePrices: "Re-evaluate prices now",
     itemDelaySafety: "Safety margin", itemDelaySoc: "Delay target SOC", itemDelaySocEnable: "Delay target SOC enabled", itemDelayDeadband: "Balance deadband",
     secHourly: "Hourly balance", hourlyEsOnly: "Only useful in Spain (RD 244/2019) · detected country: {c}", secWeeklyFull: "Weekly full charge", itemWeeklyDay: "Full charge day", itemWeeklyDelay: "Wait for solar charge delay", itemHourlyTarget: "Target net balance", itemHourlyMaxOffset: "Max power offset", itemHourlyDeadband: "Deadband", itemHourlyHysteresis: "Hysteresis",
     secSlots: "Configured slots", itemSlot: "Slot",
@@ -156,7 +156,7 @@ const I18N = {
     secTempLimit: "Límite de carga por temperatura", itemTempLimitC: "Límite de temperatura", itemTempLimitBand: "Banda de reducción", itemTempLimitFloor: "Potencia de carga mínima", itemTempApplyDischarge: "Reducir también la descarga",
     itemMaxContracted: "Potencia contratada máx.", itemSolarSafety: "Margen de seguridad solar", itemGridChargeMargin: "Margen de carga de red", itemMinSocFloorEnable: "Suelo de SOC", itemMinSocFloor: "SOC mínimo garantizado",
     itemSocThreshold: "Umbral de SOC", itemPeakLimit: "Límite de pico",
-    itemMaxPrice: "Precio máximo (carga)", itemDischargePrice: "Precio mínimo de descarga", itemPriceDischarge: "Descargar solo si precio alto",
+    itemMaxPrice: "Precio máximo (carga)", itemDischargePrice: "Precio mínimo de descarga", itemPriceDischarge: "Descargar solo si precio alto", itemReevaluatePrices: "Reevaluar precios ahora",
     itemDelaySafety: "Margen de seguridad", itemDelaySoc: "SOC objetivo de retardo", itemDelaySocEnable: "SOC objetivo de retardo activo", itemDelayDeadband: "Banda muerta de balance",
     secHourly: "Balance horario", hourlyEsOnly: "Solo útil en España (RD 244/2019) · país detectado: {c}", secWeeklyFull: "Carga semanal completa", itemWeeklyDay: "Día de carga completa", itemWeeklyDelay: "Esperar al retraso por solar", itemHourlyTarget: "Objetivo de balance neto", itemHourlyMaxOffset: "Offset máx. de potencia", itemHourlyDeadband: "Banda muerta", itemHourlyHysteresis: "Histéresis",
     secSlots: "Franjas configuradas", itemSlot: "Franja",
@@ -221,7 +221,7 @@ const I18N = {
     secTempLimit: "Límit de càrrega per temperatura", itemTempLimitC: "Límit de temperatura", itemTempLimitBand: "Banda de reducció", itemTempLimitFloor: "Potència de càrrega mínima", itemTempApplyDischarge: "Redueix també la descàrrega",
     itemMaxContracted: "Potència contractada màx.", itemSolarSafety: "Marge de seguretat solar", itemGridChargeMargin: "Marge de càrrega de xarxa", itemMinSocFloorEnable: "SOC Mínim", itemMinSocFloor: "SOC mínim garantit",
     itemSocThreshold: "Llindar de SOC", itemPeakLimit: "Límit de pic",
-    itemMaxPrice: "Preu màxim (càrrega)", itemDischargePrice: "Preu mínim de descàrrega", itemPriceDischarge: "Descarregar només si preu alt",
+    itemMaxPrice: "Preu màxim (càrrega)", itemDischargePrice: "Preu mínim de descàrrega", itemPriceDischarge: "Descarregar només si preu alt", itemReevaluatePrices: "Reavaluar preus ara",
     itemDelaySafety: "Marge de seguretat", itemDelaySoc: "SOC objectiu de retard", itemDelaySocEnable: "SOC objectiu de retard actiu", itemDelayDeadband: "Banda morta de balanç",
     secHourly: "Balanç horari", hourlyEsOnly: "Només útil a Espanya (RD 244/2019) · país detectat: {c}", secWeeklyFull: "Càrrega setmanal completa", itemWeeklyDay: "Dia de càrrega completa", itemWeeklyDelay: "Espera el retard per solar", itemHourlyTarget: "Objectiu de balanç net", itemHourlyMaxOffset: "Offset màx. de potència", itemHourlyDeadband: "Banda morta", itemHourlyHysteresis: "Histèresi",
     secSlots: "Franges configurades", itemSlot: "Franja",
@@ -286,7 +286,7 @@ const I18N = {
     secTempLimit: "Temperaturbasierte Ladebegrenzung", itemTempLimitC: "Temperaturgrenze", itemTempLimitBand: "Drosselbereich", itemTempLimitFloor: "Minimale Ladeleistung", itemTempApplyDischarge: "Auch Entladung drosseln",
     itemMaxContracted: "Max. Vertragsleistung", itemSolarSafety: "Sicherheitspuffer Solar", itemGridChargeMargin: "Netzladungs-Marge", itemMinSocFloorEnable: "SOC-Untergrenze", itemMinSocFloor: "Garantierter Mindest-SOC",
     itemSocThreshold: "SOC-Schwelle", itemPeakLimit: "Spitzenlimit",
-    itemMaxPrice: "Max. Preis (Laden)", itemDischargePrice: "Entlade-Preisuntergrenze", itemPriceDischarge: "Nur über Preis entladen",
+    itemMaxPrice: "Max. Preis (Laden)", itemDischargePrice: "Entlade-Preisuntergrenze", itemPriceDischarge: "Nur über Preis entladen", itemReevaluatePrices: "Preise jetzt neu bewerten",
     itemDelaySafety: "Sicherheitspuffer", itemDelaySoc: "Verzögerungs-Ziel-SOC", itemDelaySocEnable: "Verzögerungs-Ziel-SOC aktiv", itemDelayDeadband: "Bilanz-Totband",
     secHourly: "Stündliche Balance", hourlyEsOnly: "Nur in Spanien sinnvoll (RD 244/2019) · erkanntes Land: {c}", secWeeklyFull: "Wöchentliche Vollladung", itemWeeklyDay: "Tag der Vollladung", itemWeeklyDelay: "Auf Solar-Ladeverzögerung warten", itemHourlyTarget: "Ziel-Nettobalance", itemHourlyMaxOffset: "Max. Leistungs-Offset", itemHourlyDeadband: "Totband", itemHourlyHysteresis: "Hysterese",
     secSlots: "Konfigurierte Zeitfenster", itemSlot: "Zeitfenster",
@@ -351,7 +351,7 @@ const I18N = {
     secTempLimit: "Limite de charge par température", itemTempLimitC: "Limite de température", itemTempLimitBand: "Plage de réduction", itemTempLimitFloor: "Puissance de charge minimale", itemTempApplyDischarge: "Réduire aussi la décharge",
     itemMaxContracted: "Puissance contractuelle max.", itemSolarSafety: "Marge de sécurité solaire", itemGridChargeMargin: "Marge de charge réseau", itemMinSocFloorEnable: "Plancher SOC", itemMinSocFloor: "SOC minimum garanti",
     itemSocThreshold: "Seuil SOC", itemPeakLimit: "Limite de pointe",
-    itemMaxPrice: "Prix max. (charge)", itemDischargePrice: "Prix plancher de décharge", itemPriceDischarge: "Décharger si prix élevé",
+    itemMaxPrice: "Prix max. (charge)", itemDischargePrice: "Prix plancher de décharge", itemPriceDischarge: "Décharger si prix élevé", itemReevaluatePrices: "Réévaluer les prix",
     itemDelaySafety: "Marge de sécurité", itemDelaySoc: "SOC cible du délai", itemDelaySocEnable: "SOC cible du délai actif", itemDelayDeadband: "Bande morte de bilan",
     secHourly: "Bilan horaire", hourlyEsOnly: "Utile uniquement en Espagne (RD 244/2019) · pays détecté : {c}", secWeeklyFull: "Charge complète hebdomadaire", itemWeeklyDay: "Jour de charge complète", itemWeeklyDelay: "Attendre le délai de charge solaire", itemHourlyTarget: "Cible bilan net", itemHourlyMaxOffset: "Décalage max. puissance", itemHourlyDeadband: "Bande morte", itemHourlyHysteresis: "Hystérésis",
     secSlots: "Créneaux configurés", itemSlot: "Créneau",
@@ -416,7 +416,7 @@ const I18N = {
     secTempLimit: "Temperatuurbegrenzing laden", itemTempLimitC: "Temperatuurlimiet", itemTempLimitBand: "Afbouwband", itemTempLimitFloor: "Minimaal laadvermogen", itemTempApplyDischarge: "Ook ontladen terugregelen",
     itemMaxContracted: "Max. gecontracteerd vermogen", itemSolarSafety: "Veiligheidsmarge zon", itemGridChargeMargin: "Netladingsmarge", itemMinSocFloorEnable: "SOC-vloer", itemMinSocFloor: "Gegarandeerde min. SOC",
     itemSocThreshold: "SOC-drempel", itemPeakLimit: "Pieklimiet",
-    itemMaxPrice: "Max. prijs (laden)", itemDischargePrice: "Ontlaad-prijsondergrens", itemPriceDischarge: "Alleen ontladen bij hoge prijs",
+    itemMaxPrice: "Max. prijs (laden)", itemDischargePrice: "Ontlaad-prijsondergrens", itemPriceDischarge: "Alleen ontladen bij hoge prijs", itemReevaluatePrices: "Prijzen nu herberekenen",
     itemDelaySafety: "Veiligheidsmarge", itemDelaySoc: "Doel-SOC vertraging", itemDelaySocEnable: "Doel-SOC vertraging actief", itemDelayDeadband: "Balans dode band",
     secHourly: "Uurbalans", hourlyEsOnly: "Alleen nuttig in Spanje (RD 244/2019) · gedetecteerd land: {c}", secWeeklyFull: "Wekelijkse volledige lading", itemWeeklyDay: "Dag volledige lading", itemWeeklyDelay: "Wachten op zonne-laadvertraging", itemHourlyTarget: "Doel nettosaldo", itemHourlyMaxOffset: "Max. vermogensoffset", itemHourlyDeadband: "Dodeband", itemHourlyHysteresis: "Hysterese",
     secSlots: "Geconfigureerde tijdvakken", itemSlot: "Tijdvak",
@@ -707,6 +707,9 @@ const SYS_SECTIONS = [
       { key: "rt_price_discharge_control", domain: "switch", lk: "itemPriceDischarge", icon: "mdi:cash-clock" },
       { key: "max_price_threshold", lk: "itemMaxPrice", icon: "mdi:cash-plus" },
       { key: "discharge_price_threshold", lk: "itemDischargePrice", icon: "mdi:cash-minus" },
+      // Dynamic-pricing only (system button exists solely in that mode), so on
+      // time-slot / real-time installs this row simply doesn't render.
+      { key: "reevaluate_dynamic_pricing", domain: "button", lk: "itemReevaluatePrices", icon: "mdi:calendar-refresh" },
     ],
   },
   {
@@ -818,6 +821,7 @@ const SYS_HELP = {
     excluded_device_exclusion_pct: "How much of this device's demand stays excluded from the battery. 100% (default) = fully excluded (battery never powers it); lower values let the battery cover the rest (e.g. 60% → battery may cover 40%). Only affects devices with a power sensor.",
     weekly_full_charge_enabled: "When ON, batteries charge to 100% one day per week (chosen below) for cell balancing, then revert to your configured max SOC.",
     dp_price_discharge_control: "When ON, the battery only discharges when the current price is above the max price threshold (or today's auto average if unset). If discharge time slots exist, both conditions must be met.",
+    reevaluate_dynamic_pricing: "Rebuild today's dynamic-pricing charge schedule right now, using the latest prices and solar forecast, instead of waiting for the automatic daily run.",
     rt_price_discharge_control: "When ON, the battery only discharges when the current price is above the threshold (fixed or daily average). If discharge time slots exist, both conditions must be met.",
     hourly_balance_target_net_wh: "Target net grid energy per hour. 0 = neutral (no net import/export). Positive = aim to import this much; negative = aim to export. Range -2 to 2 kWh.",
     hourly_balance_max_offset_w: "Maximum power adjustment the hourly balancer may apply to the battery setpoint. Higher = corrects faster but more aggressively. Range 100–5000 W.",
@@ -877,6 +881,7 @@ const SYS_HELP = {
     excluded_device_exclusion_pct: "Qué parte de la demanda de este aparato se mantiene excluida de la batería. 100% (por defecto) = totalmente excluido (la batería nunca lo alimenta); valores menores dejan que la batería cubra el resto (ej. 60% → la batería puede cubrir el 40%). Solo afecta a aparatos con sensor de potencia.",
     weekly_full_charge_enabled: "Si está activado, las baterías se cargan al 100% un día a la semana (elegido abajo) para equilibrar las celdas; después vuelven al SOC máximo configurado.",
     dp_price_discharge_control: "Si está activado, la batería solo descarga cuando el precio actual supera el umbral máximo (o la media diaria automática si no se configura). Si hay franjas de descarga, deben cumplirse ambas condiciones.",
+    reevaluate_dynamic_pricing: "Recalcula ahora mismo la planificación de carga por precios dinámicos de hoy, usando los precios y la previsión solar más recientes, sin esperar a la ejecución diaria automática.",
     rt_price_discharge_control: "Si está activado, la batería solo descarga cuando el precio actual supera el umbral (fijo o media diaria). Si hay franjas de descarga, deben cumplirse ambas condiciones.",
     hourly_balance_target_net_wh: "Energía neta de red objetivo por hora. 0 = neutro (sin importación/exportación neta). Positivo = importar esa cantidad; negativo = exportar. Rango -2 a 2 kWh.",
     hourly_balance_max_offset_w: "Ajuste máximo de potencia que el balance horario puede aplicar al setpoint de la batería. Mayor = corrige más rápido pero más agresivo. Rango 100–5000 W.",
@@ -935,6 +940,7 @@ const SYS_HELP = {
     excluded_device_cover_home: "Si s'activa (requereix Excedent Solar + sensor solar), la bateria cobreix el consum propi de la llar mentre el dispositiu funciona, important de xarxa només per al dispositiu. Si es desactiva, la bateria roman inactiva mentre el dispositiu estigui actiu.",
     weekly_full_charge_enabled: "Si està activat, les bateries es carreguen al 100% un dia a la setmana (triat a sota) per equilibrar les cel·les; després tornen al SOC màxim configurat.",
     dp_price_discharge_control: "Si està activat, la bateria només descarrega quan el preu actual supera el llindar màxim (o la mitjana diària automàtica si no es configura). Si hi ha franges de descàrrega, s'han de complir ambdues condicions.",
+    reevaluate_dynamic_pricing: "Recalcula ara mateix la planificació de càrrega per preus dinàmics d'avui, amb els preus i la previsió solar més recents, sense esperar l'execució diària automàtica.",
     rt_price_discharge_control: "Si està activat, la bateria només descarrega quan el preu actual supera el llindar (fix o mitjana diària). Si hi ha franges de descàrrega, s'han de complir ambdues condicions.",
     hourly_balance_target_net_wh: "Energia neta de xarxa objectiu per hora. 0 = neutre (sense importació/exportació neta). Positiu = importar aquesta quantitat; negatiu = exportar. Rang -2 a 2 kWh.",
     hourly_balance_max_offset_w: "Ajust màxim de potència que el balanç horari pot aplicar al setpoint de la bateria. Major = corregeix més ràpid però més agressiu. Rang 100–5000 W.",
@@ -993,6 +999,7 @@ const SYS_HELP = {
     excluded_device_cover_home: "Wenn aktiviert (benötigt Solarüberschuss + Solarsensor), deckt die Batterie den Eigenverbrauch des Hauses, während dieses Gerät läuft, und bezieht Netzstrom nur für das Gerät selbst. Wenn deaktiviert, bleibt die Batterie inaktiv, solange das Gerät aktiv ist.",
     weekly_full_charge_enabled: "Wenn EIN, laden die Batterien einmal pro Woche (unten gewählter Tag) auf 100% zum Zellausgleich und kehren dann zum konfigurierten max. SOC zurück.",
     dp_price_discharge_control: "Wenn EIN, entlädt die Batterie nur, wenn der aktuelle Preis über dem Max-Schwellenwert liegt (oder dem automatischen Tagesdurchschnitt, falls nicht gesetzt). Bei Entladezeitfenstern müssen beide Bedingungen erfüllt sein.",
+    reevaluate_dynamic_pricing: "Erstellt den heutigen dynamischen Preis-Ladeplan sofort neu, mit den aktuellsten Preisen und der Solarprognose, ohne auf den automatischen Tageslauf zu warten.",
     rt_price_discharge_control: "Wenn EIN, entlädt die Batterie nur, wenn der aktuelle Preis über dem Schwellenwert liegt (fest oder Tagesdurchschnitt). Bei Entladezeitfenstern müssen beide Bedingungen erfüllt sein.",
     hourly_balance_target_net_wh: "Ziel-Netto-Netzenergie pro Stunde. 0 = neutral (kein Netto-Import/Export). Positiv = so viel importieren; negativ = exportieren. Bereich -2 bis 2 kWh.",
     hourly_balance_max_offset_w: "Maximale Leistungsanpassung, die der Stundenausgleich auf den Batterie-Sollwert anwenden darf. Höher = schnellere, aber aggressivere Korrektur. Bereich 100–5000 W.",
@@ -1051,6 +1058,7 @@ const SYS_HELP = {
     excluded_device_cover_home: "Si activé (nécessite Surplus Solaire + capteur solaire), la batterie couvre la consommation propre de la maison pendant que cet appareil fonctionne, n'important du réseau que pour l'appareil. Si désactivé, la batterie reste inactive tant que l'appareil est actif.",
     weekly_full_charge_enabled: "Si activé, les batteries se chargent à 100% un jour par semaine (choisi ci-dessous) pour équilibrer les cellules, puis reviennent au SOC max configuré.",
     dp_price_discharge_control: "Si activé, la batterie ne se décharge que lorsque le prix actuel dépasse le seuil maximum (ou la moyenne journalière automatique si non défini). Avec des plages de décharge, les deux conditions doivent être remplies.",
+    reevaluate_dynamic_pricing: "Recalcule immédiatement le planning de charge par prix dynamiques du jour, avec les derniers prix et la prévision solaire, sans attendre l'exécution quotidienne automatique.",
     rt_price_discharge_control: "Si activé, la batterie ne se décharge que lorsque le prix actuel dépasse le seuil (fixe ou moyenne journalière). Avec des plages de décharge, les deux conditions doivent être remplies.",
     hourly_balance_target_net_wh: "Énergie réseau nette cible par heure. 0 = neutre (pas d'import/export net). Positif = importer cette quantité ; négatif = exporter. Plage -2 à 2 kWh.",
     hourly_balance_max_offset_w: "Ajustement de puissance maximal que le bilan horaire peut appliquer au point de consigne. Plus élevé = correction plus rapide mais plus agressive. Plage 100–5000 W.",
@@ -1109,6 +1117,7 @@ const SYS_HELP = {
     excluded_device_cover_home: "Indien AAN (vereist Zonne-overschot + zonnesensor) dekt de batterij het eigen huisverbruik terwijl dit apparaat draait en importeert alleen netstroom voor het apparaat zelf. Indien UIT blijft de batterij inactief zolang het apparaat actief is.",
     weekly_full_charge_enabled: "Indien AAN laden de batterijen één dag per week (hieronder gekozen) tot 100% voor celbalancering en keren daarna terug naar de geconfigureerde max. SOC.",
     dp_price_discharge_control: "Indien AAN ontlaadt de batterij alleen wanneer de huidige prijs boven de max. drempel ligt (of het automatische daggemiddelde indien niet ingesteld). Met ontlaadtijdsloten moeten beide voorwaarden gelden.",
+    reevaluate_dynamic_pricing: "Herberekent nu meteen het laadschema op basis van dynamische prijzen van vandaag, met de meest recente prijzen en zonneprognose, zonder te wachten op de automatische dagelijkse uitvoering.",
     rt_price_discharge_control: "Indien AAN ontlaadt de batterij alleen wanneer de huidige prijs boven de drempel ligt (vast of daggemiddelde). Met ontlaadtijdsloten moeten beide voorwaarden gelden.",
     hourly_balance_target_net_wh: "Doel netto netenergie per uur. 0 = neutraal (geen netto import/export). Positief = zoveel importeren; negatief = exporteren. Bereik -2 tot 2 kWh.",
     hourly_balance_max_offset_w: "Maximale vermogensaanpassing die de uurbalans op het batterij-setpoint mag toepassen. Hoger = corrigeert sneller maar agressiever. Bereik 100–5000 W.",
@@ -3944,8 +3953,13 @@ class MarstekVenusPanel extends HTMLElement {
           // Skip registry leftovers of a de-configured feature (e.g. pricing
           // entities after switching back to time slots): HA restores them
           // with an unavailable state, which would render as dead rows.
+          // Buttons sit at "unknown" until first pressed — that's normal, not a
+          // leftover — so for them only "unavailable" means truly gone.
           const st = this._hass.states[id];
-          if (st && st.state !== "unavailable" && st.state !== "unknown") {
+          const alive = item.domain === "button"
+            ? st && st.state !== "unavailable"
+            : st && st.state !== "unavailable" && st.state !== "unknown";
+          if (alive) {
             rows.push({ item, id, multi: ids.length > 1 });
           }
         }
